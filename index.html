@@ -1,0 +1,2074 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>SAM TIME TRACKER</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Time Tracker">
+<meta name="theme-color" content="#1b3a5c">
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 13px; background: #f0f2f5; color: #222; }
+
+  /* ── Top bar ── */
+  #topbar {
+    position: sticky; top: 0; z-index: 200;
+    background: #1b3a5c; color: #fff;
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; height: 52px;
+  }
+  #topbar h1 { font-size: 15px; letter-spacing: .04em; }
+  .nav-btn {
+    background: rgba(255,255,255,.18); color: #fff;
+    border: none; padding: 5px 11px; border-radius: 4px;
+    cursor: pointer; font-size: 13px;
+  }
+  .nav-btn:hover { background: rgba(255,255,255,.3); }
+  #dateInput {
+    background: rgba(255,255,255,.15); color: #fff;
+    border: 1px solid rgba(255,255,255,.3); border-radius: 4px;
+    padding: 4px 8px; font-size: 13px;
+  }
+  #dateInput::-webkit-calendar-picker-indicator { filter: invert(1); }
+  #todayBtn {
+    background: rgba(255,255,255,.12); color: #fff;
+    border: 1px solid rgba(255,255,255,.3); border-radius: 4px;
+    padding: 4px 9px; font-size: 12px; cursor: pointer;
+  }
+  #todayBtn:hover { background: rgba(255,255,255,.25); }
+  #totalDisplay {
+    font-size: 17px; font-weight: bold; min-width: 130px; text-align: right; transition: color .2s;
+  }
+  #totalDisplay.done { color: #4ade80; }
+  #syncIndicator {
+    font-size: 10px; color: rgba(255,255,255,.65); display: none;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  #syncIndicator.show { display: inline; }
+  #syncIndicator.sync-err { color: #fca5a5; }
+  #quoteDisplay {
+    font-family: 'Permanent Marker', cursive;
+    font-size: 13px; font-style: normal; color: rgba(255,255,100,.85);
+    flex: 1; text-align: center; line-height: 1.3;
+    transition: opacity .6s ease; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; cursor: default; letter-spacing: .02em;
+  }
+  #quoteDisplay.fade { opacity: 0; }
+
+  /* ── App tab bar ── */
+  #appTabBar {
+    position: sticky; top: 52px; z-index: 150; height: 40px;
+    display: flex; align-items: flex-end;
+    background: #f0f2f5; border-bottom: 2px solid #1b3a5c;
+    padding: 0 16px;
+  }
+  .app-tab-btn {
+    padding: 6px 20px 8px; font-size: 13px; font-weight: bold;
+    border: none; background: none; cursor: pointer; color: #666;
+    border-bottom: 3px solid transparent; margin-bottom: -2px;
+  }
+  .app-tab-btn.active { color: #1b3a5c; border-bottom-color: #1b3a5c; }
+  .app-tab-btn:hover:not(.active) { color: #444; background: rgba(0,0,0,.04); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Controls ── */
+  #controls {
+    position: sticky; top: 92px; z-index: 100;
+    background: #fff; border-bottom: 1px solid #dde;
+    padding: 6px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .ctrl-btn {
+    font-size: 12px; padding: 4px 10px; border-radius: 4px;
+    cursor: pointer; border: 1px solid #ccc; background: #fff;
+  }
+  .ctrl-btn:hover:not(:disabled) { background: #f5f5f5; }
+  .ctrl-btn:disabled { opacity: .4; cursor: default; }
+  .ctrl-btn.primary { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
+  .ctrl-btn.primary:hover { background: #24507e; }
+  .ctrl-btn.danger { border-color: #cc3333; color: #cc3333; }
+  .ctrl-btn.danger:hover { background: #fff0f0; }
+  #rangeDisplay {
+    font-size: 12px; color: #444; font-weight: bold;
+    padding: 4px 6px; border-radius: 4px;
+    background: #f0f2f5; border: 1px solid #dde;
+    white-space: nowrap; min-width: 140px; text-align: center;
+    cursor: pointer;
+  }
+  #rangeDisplay:hover { background: #e8eaf0; }
+  #controls-sep { width: 1px; height: 20px; background: #dde; margin: 0 2px; }
+  #dayInfo { font-size: 11px; color: #999; margin-left: auto; }
+
+  /* ── Grid ── */
+  #tableWrap { overflow: auto; height: calc(100vh - 132px); }
+  table { border-collapse: collapse; width: 100%; min-width: 400px; }
+
+  thead th {
+    position: sticky; top: 0; z-index: 50;
+    background: #1b3a5c; color: #fff;
+    padding: 6px 4px; font-size: 11px; border: 1px solid #2a4e78;
+    text-align: center; white-space: nowrap;
+  }
+  thead th.time-hdr { text-align: left; padding-left: 8px; min-width: 60px; }
+  thead th.total-hdr { min-width: 60px; }
+  .rm-btn { cursor: pointer; opacity: .45; font-size: 10px; font-weight: normal; margin-left: 2px; }
+  .rm-btn:hover { opacity: 1; color: #fca5a5; }
+
+  tbody tr.overnight { background: #f8f8f8; }
+  tbody tr.working         { background: #fff; }
+  tbody tr.working:nth-child(even) { background: #f5f7fa; }
+  tbody tr.working:hover, tbody tr.working:nth-child(even):hover { background: #e8f0fe; }
+  tbody tr.overnight:nth-child(even) { background: #f0f0f0; }
+  tbody.dragging { cursor: cell; user-select: none; }
+
+  td { border: 1px solid #eee; padding: 2px 3px; text-align: center; font-size: 11px; }
+  td.time-cell {
+    text-align: left; padding-left: 8px;
+    font-family: monospace; color: #555; min-width: 60px; white-space: nowrap;
+  }
+  td.client-cell { cursor: pointer; min-width: 30px; width: 40px; user-select: none; }
+  td.client-cell:hover:not(.sel) { background: #dbeafe; }
+  td.client-cell.sel { background: #2563eb; }
+  td.client-cell.sel.has-task { background: #1d4ed8; }
+  td.client-cell.sel.has-task::after { content: '·'; color: #93c5fd; font-size: 16px; line-height: 0; vertical-align: middle; }
+  td.client-cell.drag-preview { background: #93c5fd !important; }
+  td.total-cell { color: #444; min-width: 50px; }
+
+  tfoot td {
+    background: #eef2f7; font-weight: bold;
+    border-top: 2px solid #1b3a5c; padding: 5px 4px; font-size: 12px; text-align: center;
+  }
+  tfoot td:first-child { text-align: left; padding-left: 8px; }
+
+  /* ── Task popover ── */
+  #taskPopover {
+    display: none; position: fixed; z-index: 500;
+    background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.15); min-width: 170px; max-width: 260px;
+    padding: 4px 0; overflow: hidden;
+  }
+  .pop-header { padding: 6px 12px 5px; font-size: 11px; font-weight: bold; color: #1b3a5c; border-bottom: 1px solid #f0f0f0; }
+  .pop-opt {
+    display: block; width: 100%; text-align: left;
+    padding: 7px 12px; background: none; border: none;
+    cursor: pointer; font-size: 12px; color: #333; font-family: Arial, sans-serif;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pop-opt:hover { background: #f0f6ff; color: #1d4ed8; }
+  .pop-opt.is-sel { color: #2563eb; font-weight: bold; background: #eff6ff; }
+  .pop-opt.is-sel::before { content: '✓ '; }
+  .pop-sep { height: 1px; background: #f0f0f0; margin: 3px 0; }
+  .pop-clear { color: #888; }
+  .pop-clear:hover { background: #fef2f2; color: #cc3333; }
+  .pop-saved-row { display: flex; align-items: center; gap: 0; }
+  .pop-saved-row .pop-opt { flex: 1; border-radius: 0; }
+  .pop-saved-del { background: none; border: none; cursor: pointer; color: #ddd; font-size: 13px; padding: 5px 8px; line-height: 1; flex-shrink: 0; border-radius: 0 4px 4px 0; }
+  .pop-saved-del:hover { color: #cc3333; background: #fef2f2; }
+
+  /* ── Descriptions ── */
+  #descSection { margin: 8px 0 0; background: #fff; padding: 14px 16px 20px; }
+  #descSection h2 { font-size: 13px; font-weight: bold; color: #1b3a5c; margin-bottom: 10px; }
+  .desc-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .desc-label { min-width: 160px; font-size: 12px; font-weight: bold; line-height: 1.4; }
+  .desc-label small { font-weight: normal; color: #888; display: block; }
+  .regen-btn {
+    display: inline-block; margin-top: 3px;
+    background: none; border: 1px solid #bfdbfe; border-radius: 3px;
+    color: #2563eb; font-size: 11px; padding: 1px 6px; cursor: pointer;
+  }
+  .regen-btn:hover { background: #eff6ff; }
+  .desc-textarea {
+    flex: 1; border: 1px solid #ddd; border-radius: 4px;
+    padding: 5px 8px; font-size: 12px; font-family: Arial, sans-serif;
+    resize: vertical; min-height: 32px; line-height: 1.4;
+  }
+  .desc-textarea.auto-mode { border-color: #bfdbfe; background: #f8fbff; }
+  .desc-textarea:focus { outline: none; border-color: #2563eb; }
+  .char-count { font-size: 10px; color: #bbb; width: 44px; padding-top: 8px; text-align: right; flex-shrink: 0; }
+  .char-count.over { color: #dc2626; font-weight: bold; }
+  .desc-textarea.over-limit { border-color: #dc2626 !important; background: #fff5f5; }
+
+  /* ── Burn Rate ── */
+  #burnSection { margin: 8px 0 0; background: #fff; padding: 14px 16px 18px; }
+  .burn-hdr { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .burn-hdr strong { font-size: 13px; font-weight: bold; color: #1b3a5c; }
+  .burn-hdr span { font-size: 11px; color: #888; }
+  .burn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .burn-card-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+  .burn-card-label span { font-weight: normal; color: #666; font-size: 11px; }
+  .burn-card-label span.over { color: #dc2626; font-weight: bold; }
+  .burn-track { height: 9px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
+  .burn-fill { height: 100%; border-radius: 5px; transition: width .4s ease; background: #3b82f6; }
+  .burn-fill.done { background: #16a34a; }
+  .burn-fill.warn { background: #f59e0b; }
+  .burn-pct { font-size: 10px; color: #999; text-align: right; margin-top: 3px; }
+
+  /* ── Export bar ── */
+  #exportBar { background: #fff; border-top: 1px solid #eee; padding: 10px 16px; display: flex; gap: 8px; margin-top: 8px; }
+
+  /* ── To-Do Tab ── */
+  #todoSection { padding: 16px; }
+  #todoClientPills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .todo-pill { padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; background: #fff; white-space: nowrap; }
+  .todo-pill.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
+  .todo-pill:hover:not(.active) { background: #f0f0f0; }
+  #todoContent { background: #fff; border-radius: 6px; padding: 16px; }
+  #todoContent h3 { font-size: 14px; color: #1b3a5c; margin-bottom: 4px; }
+  .todo-subtitle { font-size: 11px; color: #999; margin-bottom: 12px; }
+  .todo-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .todo-table th { text-align: left; font-size: 11px; color: #666; border-bottom: 2px solid #eee; padding: 4px 8px; font-weight: bold; }
+  .todo-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+  .todo-table tr.done-row td { opacity: .5; }
+  .done-check { width: 15px; height: 15px; cursor: pointer; accent-color: #2563eb; }
+  .todo-task-inp { border: none; background: transparent; width: 100%; font-family: Arial, sans-serif; font-size: 13px; color: inherit; }
+  .todo-task-inp:focus { outline: 1px solid #bfdbfe; border-radius: 2px; }
+  .done-row .todo-task-inp { text-decoration: line-through; }
+  .todo-due-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: Arial, sans-serif; color: inherit; }
+  .todo-due-inp:focus { outline: none; border-color: #bfdbfe; }
+  .todo-due-inp.overdue { color: #dc2626; font-weight: bold; }
+  .todo-del-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
+  .todo-del-btn:hover { color: #cc3333; background: #fff0f0; }
+  .todo-notes-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: Arial, sans-serif; width: 100%; min-width: 120px; color: inherit; }
+  .todo-notes-inp:focus { outline: none; border-color: #bfdbfe; background: #f8fbff; }
+  .done-row .todo-notes-inp { text-decoration: line-through; }
+  .add-task-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .add-task-inp { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 13px; font-family: Arial, sans-serif; }
+  .add-task-inp:focus { outline: none; border-color: #2563eb; }
+  .add-date-inp { border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; font-size: 12px; font-family: Arial, sans-serif; }
+  .add-date-inp:focus { outline: none; border-color: #2563eb; }
+  .add-task-btn { background: #1b3a5c; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+  .add-task-btn:hover { background: #24507e; }
+
+  /* ── Settings Tab ── */
+  #settingsSection { padding: 16px; }
+  .settings-panels { display: flex; flex-direction: column; gap: 16px; max-width: 860px; }
+  .settings-panel { background: #fff; border-radius: 6px; padding: 20px 24px; }
+  .settings-panel > h2 { font-size: 14px; font-weight: bold; color: #1b3a5c; margin-bottom: 4px; }
+  .settings-desc { font-size: 12px; color: #999; margin-bottom: 14px; }
+  /* client list */
+  #settingsClientList { margin-bottom: 10px; }
+  .settings-client-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border: 1px solid #e5e7eb; border-radius: 5px;
+    margin-bottom: 4px; background: #fff;
+  }
+  .settings-client-item.drag-over { background: #eff6ff; border-color: #93c5fd; }
+  .settings-client-item.dragging-src { opacity: .4; }
+  .drag-handle { color: #d1d5db; font-size: 18px; cursor: grab; line-height: 1; user-select: none; flex-shrink: 0; }
+  .drag-handle:active { cursor: grabbing; }
+  .settings-client-name { flex: 1; font-size: 13px; }
+  .settings-client-name-inp {
+    flex: 1; border: 1px solid #bfdbfe; border-radius: 3px;
+    padding: 3px 7px; font-size: 13px; font-family: Arial, sans-serif;
+  }
+  .settings-client-name-inp:focus { outline: none; border-color: #2563eb; }
+  .s-icon-btn {
+    background: none; border: 1px solid transparent; cursor: pointer;
+    color: #9ca3af; font-size: 13px; padding: 3px 7px; border-radius: 4px; line-height: 1;
+  }
+  .s-icon-btn:hover { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
+  .s-icon-btn.del:hover { background: #fef2f2; color: #cc3333; border-color: #fecaca; }
+  .add-setting-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .settings-text-inp {
+    flex: 1; border: 1px solid #ddd; border-radius: 4px;
+    padding: 6px 10px; font-size: 13px; font-family: Arial, sans-serif;
+  }
+  .settings-text-inp:focus { outline: none; border-color: #2563eb; }
+  .settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  /* burn rate cards */
+  #settingsBurnRates { margin-bottom: 12px; }
+  .settings-br-card {
+    border: 1px solid #e5e7eb; border-radius: 6px;
+    padding: 14px 16px; margin-bottom: 10px; background: #fafafa;
+  }
+  .settings-br-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .settings-br-name {
+    border: 1px solid #d1d5db; border-radius: 4px;
+    padding: 5px 9px; font-size: 13px; font-family: Arial, sans-serif;
+    font-weight: bold; color: #1b3a5c; flex: 1; max-width: 200px; min-width: 100px;
+  }
+  .settings-br-name:focus { outline: none; border-color: #2563eb; }
+  .br-target-group { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #555; }
+  .settings-br-target {
+    width: 62px; border: 1px solid #d1d5db; border-radius: 4px;
+    padding: 5px 7px; font-size: 12px; font-family: Arial, sans-serif; text-align: right;
+  }
+  .settings-br-target:focus { outline: none; border-color: #2563eb; }
+  .settings-br-del { margin-left: auto; }
+  .settings-br-lbl { font-size: 11px; font-weight: bold; color: #666; margin-bottom: 7px; text-transform: uppercase; letter-spacing: .04em; }
+  .client-checkbox-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+  .client-cb-pill {
+    display: flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border: 1px solid #e5e7eb; border-radius: 20px;
+    font-size: 12px; background: #fff; cursor: pointer; user-select: none; transition: all .12s;
+  }
+  .client-cb-pill:hover { background: #eff6ff; border-color: #bfdbfe; }
+  .client-cb-pill.checked { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; font-weight: bold; }
+  .client-cb-pill input { display: none; }
+  .br-no-clients { font-size: 12px; color: #aaa; font-style: italic; }
+  .settings-reset-row { margin-top: 14px; padding-top: 14px; border-top: 1px solid #f0f0f0; display: flex; gap: 8px; align-items: center; }
+  .settings-reset-note { font-size: 11px; color: #aaa; }
+
+  /* ── Home Tab ── */
+  #homeSection { padding: 16px; max-width: 1000px; }
+  .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .home-panel { background: #fff; border-radius: 6px; padding: 14px 16px; }
+  .home-panel h2 { font-size: 13px; font-weight: bold; color: #1b3a5c; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .home-task-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f5f5f5; }
+  .home-task-item:last-child { border-bottom: none; }
+  .home-task-group { font-size: 11px; color: #999; min-width: 68px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .home-task-text { font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .home-task-due { font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0; }
+  .home-task-due.overdue { color: #dc2626; font-weight: bold; }
+  .home-task-due.today-due { color: #d97706; font-weight: bold; }
+  .home-empty { font-size: 12px; color: #bbb; font-style: italic; margin: 4px 0; }
+  .home-more { font-size: 11px; color: #bbb; text-align: right; margin: 6px 0 0; }
+  .home-done-cb { width: 13px; height: 13px; cursor: pointer; accent-color: #2563eb; flex-shrink: 0; }
+  .home-time-log { margin-top: 14px; }
+  .home-time-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
+  .home-time-total { margin: 8px 0 0; font-size: 12px; font-weight: bold; text-align: right; color: #1b3a5c; }
+
+  /* ── Priority ── */
+  .priority-badge { font-size: 10px; font-weight: bold; padding: 1px 5px; border-radius: 3px; white-space: nowrap; flex-shrink: 0; }
+  .priority-high { background: #fee2e2; color: #dc2626; }
+  .priority-med  { background: #fef3c7; color: #d97706; }
+  .priority-low  { background: #dcfce7; color: #16a34a; }
+  .todo-priority-sel { font-size: 11px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 3px; font-family: Arial, sans-serif; cursor: pointer; max-width: 70px; }
+  .todo-priority-sel:focus { outline: none; border-color: #bfdbfe; }
+  .done-row .todo-priority-sel { opacity: .5; }
+
+  /* ── Sort bar ── */
+  .todo-sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #666; }
+  .todo-sort-btn { font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; border: 1px solid #ddd; background: #fff; font-family: Arial, sans-serif; }
+  .todo-sort-btn.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
+  .todo-all-group-hdr { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: .04em; padding: 10px 8px 4px; }
+
+  /* ── Sync Panel ── */
+  .sync-field-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #555; font-weight: bold; margin-bottom: 8px; }
+  .sync-field-lbl input { font-weight: normal; font-family: Arial, sans-serif; }
+  .sync-status { font-size: 11px; color: #888; margin: 10px 0 0; min-height: 14px; line-height: 1.4; }
+  .sync-ok  { color: #16a34a; font-weight: bold; }
+  .sync-err { color: #dc2626; font-weight: bold; }
+  .sync-gist-id { font-family: monospace; font-size: 12px; background: #f5f5f5; padding: 4px 8px; border-radius: 4px; border: 1px solid #e5e7eb; cursor: text; word-break: break-all; }
+
+  /* ── Mobile ─────────────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    /* Top bar: hide quote, tighten up */
+    #quoteDisplay { display: none; }
+    #topbar { gap: 5px; padding: 6px 8px; height: 52px; }
+    #topbar h1 { font-size: 11px; letter-spacing: 0; flex-shrink: 0; }
+    .nav-btn { padding: 4px 7px; font-size: 11px; }
+    #dateInput { padding: 3px 4px; font-size: 11px; max-width: 108px; min-width: 0; flex-shrink: 1; }
+    #todayBtn { padding: 3px 6px; font-size: 10px; flex-shrink: 0; }
+    #totalDisplay { font-size: 13px; min-width: 76px; }
+
+    /* Tab bar */
+    .app-tab-btn { padding: 5px 7px 7px; font-size: 11px; }
+
+    /* Controls */
+    #controls { padding: 5px 8px; gap: 5px; top: 92px; }
+    .ctrl-btn { font-size: 11px; padding: 4px 8px; }
+    #rangeDisplay { font-size: 11px; min-width: 90px; }
+    #dayInfo { display: none; }
+
+    /* Time grid */
+    #tableWrap { height: calc(100vh - 134px); }
+    td { padding: 1px 1px; }
+    td.time-cell { font-size: 10px; min-width: 44px; padding-left: 4px; }
+    td.client-cell { min-width: 30px; width: 34px; min-height: 28px; }
+    thead th { padding: 5px 2px; font-size: 10px; }
+    thead th.time-hdr { padding-left: 4px; min-width: 44px; }
+    tfoot td { padding: 3px 2px; font-size: 10px; }
+    tfoot td:first-child { padding-left: 4px; }
+
+    /* Descriptions */
+    #descSection { padding: 10px; }
+    .desc-row { flex-direction: column; gap: 5px; }
+    .desc-label { min-width: 0; }
+
+    /* Burn / export */
+    #burnSection { padding: 10px; }
+    .burn-grid { grid-template-columns: 1fr; }
+    #exportBar { padding: 8px 10px; }
+
+    /* Home */
+    #homeSection { padding: 10px; }
+    .home-grid { grid-template-columns: 1fr; gap: 10px; }
+
+    /* To-Do */
+    #todoSection { padding: 10px; }
+    #todoClientPills { gap: 4px; margin-bottom: 10px; }
+    .todo-pill { padding: 4px 9px; font-size: 11px; }
+    #todoContent { padding: 10px; }
+    .add-task-row { flex-wrap: wrap; gap: 6px; }
+    .add-task-inp { flex: 1 1 100%; min-width: 0; }
+    .add-date-inp { flex: 1; }
+    .todo-table { font-size: 12px; }
+    .todo-table th, .todo-table td { padding: 4px 4px; }
+    .todo-sort-bar { font-size: 11px; }
+
+    /* Settings */
+    #settingsSection { padding: 10px; }
+    .settings-panel { padding: 14px; }
+    .settings-br-header { flex-wrap: wrap; }
+    .add-setting-row { flex-wrap: wrap; }
+
+    /* Popover: bottom sheet */
+    #taskPopover.mobile-sheet {
+      left: 0 !important; right: 0 !important; bottom: 0 !important;
+      top: auto !important; width: 100% !important; max-width: 100% !important;
+      min-width: 0 !important;
+      border-radius: 16px 16px 0 0;
+      max-height: 65vh; overflow-y: auto; overflow-x: hidden;
+      box-shadow: 0 -6px 28px rgba(0,0,0,.22);
+      border: none; border-top: 1px solid #e5e7eb;
+      padding-bottom: env(safe-area-inset-bottom, 8px);
+    }
+    #taskPopover.mobile-sheet::before {
+      content: ''; display: block; width: 36px; height: 4px;
+      background: #d1d5db; border-radius: 2px;
+      margin: 10px auto 4px;
+    }
+    #taskPopover.mobile-sheet .pop-opt { padding: 13px 16px; font-size: 14px; }
+    #taskPopover.mobile-sheet .pop-header { padding: 10px 16px 6px; font-size: 12px; }
+    #taskPopover.mobile-sheet .pop-saved-del { padding: 8px 14px; font-size: 15px; }
+    #taskPopover.mobile-sheet .pop-sep { margin: 4px 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div id="topbar">
+  <h1>SAM TIME TRACKER</h1>
+  <button class="nav-btn" id="prevBtn">&#8592; Prev</button>
+  <input type="date" id="dateInput">
+  <button class="nav-btn" id="nextBtn">Next &#8594;</button>
+  <button id="todayBtn">Today</button>
+  <div id="quoteDisplay" title="Click for next quote"></div>
+  <span id="syncIndicator"></span>
+  <div id="totalDisplay">0.00 / 8.0 hrs</div>
+</div>
+
+<!-- ── App tab bar ── -->
+<div id="appTabBar">
+  <button class="app-tab-btn" data-tab="home">&#8962; Home</button>
+  <button class="app-tab-btn active" data-tab="tracker">&#9200; Time Tracker</button>
+  <button class="app-tab-btn" data-tab="todos">&#9745; To-Do Lists</button>
+  <button class="app-tab-btn" data-tab="settings">&#9881; Settings</button>
+</div>
+
+<!-- ── Home Tab ── -->
+<div id="tab-home" class="tab-content">
+  <div id="homeSection"></div>
+</div>
+
+<!-- ── Time Tracker Tab ── -->
+<div id="tab-tracker" class="tab-content active">
+  <div id="controls">
+    <button class="ctrl-btn" id="earlierBtn">&#9650; Earlier</button>
+    <span id="rangeDisplay" title="Click to reset to 8 AM – 7 PM">8:00 AM – 7:00 PM</span>
+    <button class="ctrl-btn" id="laterBtn">Later &#9660;</button>
+    <div id="controls-sep"></div>
+    <button class="ctrl-btn primary" id="addClientBtn">+ Add Client</button>
+    <button class="ctrl-btn danger" id="clearBtn">Clear Day</button>
+    <span id="dayInfo"></span>
+  </div>
+  <div id="tableWrap">
+    <table>
+      <thead id="thead"></thead>
+      <tbody id="tbody"></tbody>
+      <tfoot id="tfoot"></tfoot>
+    </table>
+  </div>
+  <div id="descSection">
+    <h2>Daily Client Descriptions</h2>
+    <div id="descRows"></div>
+  </div>
+  <div id="burnSection"></div>
+  <div id="exportBar">
+    <button class="ctrl-btn" id="exportBtn">Export CSV</button>
+  </div>
+</div>
+
+<!-- ── To-Do Lists Tab ── -->
+<div id="tab-todos" class="tab-content">
+  <div id="todoSection">
+    <div id="todoClientPills"></div>
+    <div id="todoContent">
+      <p class="todo-empty">Select a client above to view its to-do list.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings Tab ── -->
+<div id="tab-settings" class="tab-content">
+  <div id="settingsSection">
+    <div class="settings-panels">
+
+      <!-- Panel 1: Default Client List -->
+      <div class="settings-panel">
+        <h2>Default Client List</h2>
+        <p class="settings-desc">Clients added to every new day. Drag rows to reorder.</p>
+        <div id="settingsClientList"></div>
+        <div class="add-setting-row">
+          <input type="text" id="newClientInp" class="settings-text-inp" placeholder="New client name…">
+          <button class="ctrl-btn primary" id="addSettingsClientBtn">+ Add</button>
+        </div>
+        <div class="settings-actions">
+          <button class="ctrl-btn" id="applyClientsToTodayBtn">Apply to Today</button>
+          <button class="ctrl-btn" id="applyClientsToAllBtn">Apply to All Days</button>
+        </div>
+      </div>
+
+      <!-- Panel 2: Burn Rate Groups -->
+      <div class="settings-panel">
+        <h2>Burn Rate Groups</h2>
+        <p class="settings-desc">Each group tracks monthly hours toward a target. Assign any clients to each group.</p>
+        <div id="settingsBurnRates"></div>
+        <button class="ctrl-btn primary" id="addBurnRateBtn">+ Add Group</button>
+        <div class="settings-reset-row">
+          <button class="ctrl-btn danger" id="resetConfigBtn">Reset to Defaults</button>
+          <span class="settings-reset-note">Restores the original client list and burn rate groups.</span>
+        </div>
+      </div>
+
+      <!-- Panel 3: Cross-Device Sync -->
+      <div id="syncPanel"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Task popover ── -->
+<div id="taskPopover"></div>
+
+<script>
+// ── Constants ────────────────────────────────────────────────
+const DEFAULT_CLIENTS = [
+  'Axon', "L'Oreal", 'VGNT', 'HSY Tier 1', 'HSY Tier 2', 'HSY Tier 3',
+  "HSY Dot's", 'HSY Issues Management', 'HSY Corp Storytelling',
+  "Reese's", 'HSY Program MGMT', 'Admin', 'Flex'
+];
+
+// Initial burn rate groups — mirrors the original hardcoded logic
+const INITIAL_BR_GROUPS = [
+  { id: 'br_axon',   label: 'Axon',      target: 75, clients: ['Axon'] },
+  { id: 'br_vgnt',   label: 'Versigent', target: 50, clients: ['VGNT'] },
+  { id: 'br_loreal', label: "L'Oreal",   target: 20, clients: ["L'Oreal"] },
+  {
+    id: 'br_hsy', label: 'Hershey', target: 20,
+    clients: ['HSY Tier 1', 'HSY Tier 2', 'HSY Tier 3', "HSY Dot's",
+              'HSY Issues Management', 'HSY Corp Storytelling', "Reese's", 'HSY Program MGMT']
+  },
+];
+
+// All 96 quarter-hour slots
+const SLOTS = [];
+for (let i = 0; i < 96; i++) {
+  const mins = i * 15;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  const time = `${pad(h)}:${pad(m)}`;
+  const nh = Math.floor((mins + 15) / 60), nm = (mins + 15) % 60;
+  const nextTime = nh >= 24 ? '24:00' : `${pad(nh)}:${pad(nm)}`;
+  SLOTS.push({ time, mins, label: `${time}-${nextTime}` });
+}
+
+const PRIORITIES = [
+  { val: 0, label: '—' },
+  { val: 1, label: 'High' },
+  { val: 2, label: 'Med' },
+  { val: 3, label: 'Low' },
+];
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function isAxonClient(n) { return n.toLowerCase().startsWith('axon'); }
+function fmtHrs(h) { return String(+(h.toFixed(2))); }
+
+function fmtRange(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const h12 = h % 12 || 12;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  return `${h12}${m ? ':' + pad(m) : ''} ${ampm}`;
+}
+
+// ── Config ───────────────────────────────────────────────────
+let config = { defaultClients: [], burnRates: [] };
+
+function configLoad() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('stt_config') || 'null');
+    if (stored && stored.defaultClients && stored.burnRates) {
+      config = stored;
+    } else {
+      config = buildDefaultConfig();
+    }
+  } catch {
+    config = buildDefaultConfig();
+  }
+}
+
+function buildDefaultConfig() {
+  return {
+    defaultClients: [...DEFAULT_CLIENTS],
+    burnRates: INITIAL_BR_GROUPS.map(r => ({ ...r, clients: [...r.clients] }))
+  };
+}
+
+function configSave() {
+  localStorage.setItem('stt_config', JSON.stringify(config));
+}
+
+// ── Storage: Tracker ─────────────────────────────────────────
+let db = {};
+function dbLoad() { try { db = JSON.parse(localStorage.getItem('stt_v1') || '{}'); } catch { db = {}; } }
+function dbSave() { localStorage.setItem('stt_v1', JSON.stringify(db)); }
+
+function getDay(date) {
+  if (!db[date]) {
+    const keys = Object.keys(db).sort();
+    const clients = keys.length
+      ? [...(db[keys[keys.length - 1]].clients || config.defaultClients)]
+      : [...config.defaultClients];
+    db[date] = { clients, blocks: {}, descriptions: {}, descManual: {} };
+    dbSave();
+  }
+  if (!db[date].descManual) db[date].descManual = {};
+  return db[date];
+}
+
+function bClient(b) { return !b ? null : (typeof b === 'string' ? b : b.client); }
+function bTaskId(b) { return b && typeof b === 'object' ? (b.taskId || null) : null; }
+function bOtherText(b) { return b && typeof b === 'object' ? (b.otherText || '') : ''; }
+function setBlock(day, time, client, taskId = null, otherText = '') {
+  if (!client) { delete day.blocks[time]; return; }
+  const block = { client, taskId };
+  if (otherText) block.otherText = otherText;
+  day.blocks[time] = block;
+}
+
+// ── Storage: To-Dos ──────────────────────────────────────────
+let todos = {};
+function todosLoad() {
+  try { todos = JSON.parse(localStorage.getItem('stt_todos') || '{}'); } catch { todos = {}; }
+  const migrate = Object.keys(todos).filter(k => { const n = k.toLowerCase(); return (n.startsWith('hsy') || n === "reese's") && k !== 'Hershey'; });
+  if (migrate.length) {
+    if (!todos['Hershey']) todos['Hershey'] = [];
+    migrate.forEach(k => { todos['Hershey'].push(...todos[k]); delete todos[k]; });
+    todosSave();
+  }
+}
+function todosSave() { localStorage.setItem('stt_todos', JSON.stringify(todos)); }
+
+// ── Storage: Custom saved "Other" tasks ──────────────────────
+let customTasks = {};
+function customLoad() { try { customTasks = JSON.parse(localStorage.getItem('stt_custom') || '{}'); } catch { customTasks = {}; } }
+function customSave() { localStorage.setItem('stt_custom', JSON.stringify(customTasks)); }
+function getCustomTasks(client) { const g = getTodoGroup(client); return customTasks[g] || []; }
+function addCustomTask(client, text) {
+  const g = getTodoGroup(client);
+  if (!customTasks[g]) customTasks[g] = [];
+  if (!customTasks[g].includes(text)) { customTasks[g].push(text); customSave(); }
+}
+function removeCustomTask(client, text) {
+  const g = getTodoGroup(client);
+  if (customTasks[g]) { customTasks[g] = customTasks[g].filter(t => t !== text); customSave(); }
+}
+
+function getTodoGroup(client) {
+  const n = client.toLowerCase();
+  if (n.startsWith('hsy') || n === "reese's") return 'Hershey';
+  return client;
+}
+
+function clientTodos(client) { const g = getTodoGroup(client); if (!todos[g]) todos[g] = []; return todos[g]; }
+function findTask(client, taskId) { return clientTodos(client).find(t => t.id === taskId) || null; }
+function addTask(group, text, dueDate, dueTime) { clientTodos(group).push({ id: uid(), task: text, dueDate: dueDate || '', dueTime: dueTime || '', notes: '', priority: 0, done: false }); todosSave(); }
+function deleteTask(group, taskId) {
+  const g = getTodoGroup(group);
+  todos[g] = (todos[g] || []).filter(t => t.id !== taskId);
+  Object.values(db).forEach(day => Object.keys(day.blocks).forEach(t => { if (bTaskId(day.blocks[t]) === taskId) day.blocks[t].taskId = '__other__'; }));
+  todosSave(); dbSave();
+}
+function toggleDone(group, taskId) { const t = findTask(group, taskId); if (t) { t.done = !t.done; todosSave(); } }
+function updateTaskField(group, taskId, field, val) { const t = findTask(group, taskId); if (t) { t[field] = val; todosSave(); } }
+
+// ── App State ────────────────────────────────────────────────
+let currentDate = todayStr();
+let rangeStart = 8 * 60;
+let rangeEnd   = 19 * 60;
+let activeTodoGroup = null;
+let todoSortMode = 'date'; // 'date' | 'priority'
+
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function offsetDate(date, d) { const dt = new Date(date + 'T12:00:00'); dt.setDate(dt.getDate() + d); return dt.toISOString().split('T')[0]; }
+
+function sortedTasks(tasks) {
+  return [...tasks].sort((a, b) => {
+    if (todoSortMode === 'priority') {
+      const pa = a.priority || 99, pb = b.priority || 99;
+      if (pa !== pb) return pa - pb;
+    }
+    const da = a.dueDate || '9999-99-99', db = b.dueDate || '9999-99-99';
+    if (da !== db) return da.localeCompare(db);
+    return (a.dueTime || '').localeCompare(b.dueTime || '');
+  });
+}
+
+function updateRangeDisplay() {
+  document.getElementById('rangeDisplay').textContent = `${fmtRange(rangeStart)} – ${fmtRange(rangeEnd)}`;
+  document.getElementById('earlierBtn').disabled = rangeStart <= 0;
+  document.getElementById('laterBtn').disabled = rangeEnd >= 1440;
+}
+
+// ── Calculations ─────────────────────────────────────────────
+function calcTotals(day) {
+  const byClient = Object.fromEntries(day.clients.map(c => [c, 0]));
+  SLOTS.forEach(s => { const c = bClient(day.blocks[s.time]); if (c && byClient[c] !== undefined) byClient[c] += 0.25; });
+  return { byClient, grand: Object.values(byClient).reduce((a, b) => a + b, 0) };
+}
+
+function calcTaskHours(client, day) {
+  const out = {};
+  SLOTS.forEach(s => { const b = day.blocks[s.time]; if (!b || bClient(b) !== client) return; const k = bTaskId(b) || '__other__'; out[k] = (out[k] || 0) + 0.25; });
+  return out;
+}
+
+function generateDesc(client, day) {
+  const tasks = {};
+  SLOTS.forEach(s => {
+    const b = day.blocks[s.time];
+    if (!b || bClient(b) !== client) return;
+    const taskId = bTaskId(b) || '__other__';
+    let key, label;
+    if (taskId === '__meeting_int__') {
+      key = '__meeting_int__'; label = 'Standing Meeting (Internal)';
+    } else if (taskId === '__meeting_cli__') {
+      key = '__meeting_cli__'; label = 'Standing Meeting (Client)';
+    } else if (taskId === '__other__') {
+      const ot = bOtherText(b);
+      key = '__other__:' + ot;
+      label = ot || 'other';
+    } else {
+      key = taskId;
+      const obj = findTask(client, taskId);
+      label = obj ? obj.task : 'other';
+    }
+    if (!tasks[key]) tasks[key] = { label, hrs: 0 };
+    tasks[key].hrs += 0.25;
+  });
+  if (!Object.keys(tasks).length) return '';
+  return Object.values(tasks).map(({ label, hrs }) =>
+    (isAxonClient(client) && hrs > 1) ? `${label} (${fmtHrs(hrs)})` : label
+  ).join(', ');
+}
+
+function autoFillDescs(day) {
+  day.clients.forEach(c => { if (!day.descManual[c]) day.descriptions[c] = generateDesc(c, day); });
+}
+
+// Uses config.burnRates — no hardcoded groups
+function calcMonthlyHours() {
+  const d = new Date(currentDate + 'T12:00:00');
+  const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+  const hours = config.burnRates.map(() => 0);
+  Object.keys(db).forEach(date => {
+    if (!date.startsWith(prefix)) return;
+    SLOTS.forEach(s => {
+      const c = bClient(db[date].blocks[s.time]);
+      if (c) config.burnRates.forEach((r, i) => { if (r.clients.includes(c)) hours[i] += 0.25; });
+    });
+  });
+  return config.burnRates.map((r, i) => ({ ...r, hours: hours[i] }));
+}
+
+// ── Render: Tracker ──────────────────────────────────────────
+function renderAll() {
+  const day = getDay(currentDate);
+  document.getElementById('dateInput').value = currentDate;
+  updateRangeDisplay();
+  renderHead(day);
+  renderBody(day);
+  renderFoot(day);
+  renderDescs(day);
+  renderBurnRate();
+  updateTotalDisplay(day);
+  updateDayInfo();
+}
+
+function renderHead(day) {
+  const tr = document.createElement('tr');
+  const thTime = document.createElement('th'); thTime.className = 'time-hdr'; thTime.textContent = 'Time'; tr.appendChild(thTime);
+  day.clients.forEach((c, i) => {
+    const th = document.createElement('th'); th.title = c;
+    const short = c.length > 12 ? c.slice(0, 11) + '…' : c;
+    th.innerHTML = `${esc(short)}<span class="rm-btn" data-i="${i}" title="Remove ${esc(c)}"> ✕</span>`;
+    tr.appendChild(th);
+  });
+  const thTotal = document.createElement('th'); thTotal.className = 'total-hdr'; thTotal.textContent = 'Total (hrs)'; tr.appendChild(thTotal);
+  const thead = document.getElementById('thead'); thead.innerHTML = ''; thead.appendChild(tr);
+}
+
+function renderBody(day) {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  const { clients, blocks } = day;
+
+  SLOTS.forEach(slot => {
+    if (slot.mins < rangeStart || slot.mins > rangeEnd) return;
+    const b = blocks[slot.time];
+    const selClient = bClient(b);
+    const hasTask = !!bTaskId(b);
+
+    const tr = document.createElement('tr');
+    tr.className = slot.mins < 450 ? 'overnight' : 'working';
+    tr.dataset.time = slot.time;
+
+    const tdTime = document.createElement('td'); tdTime.className = 'time-cell'; tdTime.textContent = slot.label; tr.appendChild(tdTime);
+
+    clients.forEach((c, i) => {
+      const td = document.createElement('td');
+      let cls = 'client-cell';
+      if (selClient === c) { cls += ' sel'; if (hasTask) cls += ' has-task'; }
+      td.className = cls; td.dataset.time = slot.time; td.dataset.ci = i;
+      tr.appendChild(td);
+    });
+
+    const tdTotal = document.createElement('td'); tdTotal.className = 'total-cell'; tdTotal.textContent = selClient ? '0.25' : ''; tr.appendChild(tdTotal);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderFoot(day) {
+  const totals = calcTotals(day);
+  let html = '<tr><td>SUMS</td>';
+  day.clients.forEach(c => { const t = totals.byClient[c] || 0; html += `<td>${t > 0 ? t.toFixed(2) : '-'}</td>`; });
+  html += `<td>${totals.grand.toFixed(2)}</td></tr>`;
+  document.getElementById('tfoot').innerHTML = html;
+}
+
+function renderDescs(day) {
+  autoFillDescs(day);
+  const totals = calcTotals(day);
+  const container = document.getElementById('descRows');
+  container.innerHTML = '';
+  day.clients.forEach((c, i) => {
+    const hrs = totals.byClient[c] || 0;
+    const isManual = !!day.descManual[c];
+    const desc = day.descriptions[c] || '';
+    const row = document.createElement('div'); row.className = 'desc-row';
+    const label = document.createElement('div'); label.className = 'desc-label';
+    label.innerHTML = `${esc(c)}<small>${hrs > 0 ? hrs.toFixed(2) + ' hrs' : '–'}</small>`;
+    const regenBtn = document.createElement('button');
+    regenBtn.className = 'regen-btn'; regenBtn.dataset.ci = i; regenBtn.title = 'Regenerate from tasks'; regenBtn.textContent = '↺ auto-fill';
+    label.appendChild(regenBtn);
+    const ta = document.createElement('textarea');
+    ta.className = 'desc-textarea' + (isManual ? '' : ' auto-mode') + (desc.length > 125 ? ' over-limit' : ''); ta.dataset.ci = i;
+    ta.placeholder = isManual ? 'Type description…' : 'Auto-fills from task selections…'; ta.value = desc;
+    const countEl = document.createElement('div');
+    countEl.className = 'char-count' + (desc.length > 125 ? ' over' : ''); countEl.textContent = `${desc.length}/125`;
+    row.appendChild(label); row.appendChild(ta); row.appendChild(countEl);
+    container.appendChild(row);
+  });
+}
+
+function renderBurnRate() {
+  const d = new Date(currentDate + 'T12:00:00');
+  const monthName = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  const monthPct = d.getDate() / daysInMonth;
+  const data = calcMonthlyHours();
+  const section = document.getElementById('burnSection'); section.innerHTML = '';
+  if (!data.length) return;
+  const hdr = document.createElement('div'); hdr.className = 'burn-hdr';
+  hdr.innerHTML = `<strong>Monthly Burn Rate</strong><span>${monthName}</span>`; section.appendChild(hdr);
+  const grid = document.createElement('div'); grid.className = 'burn-grid';
+  data.forEach(({ label, target, hours }) => {
+    const fillPct = Math.min(100, (hours / target) * 100);
+    const isOver = hours > target;
+    const isWarn = !isOver && (hours / target) - monthPct < -0.15;
+    const card = document.createElement('div'); card.className = 'burn-card';
+    const lbl = document.createElement('div'); lbl.className = 'burn-card-label';
+    lbl.innerHTML = `<strong>${esc(label)}</strong><span class="${isOver ? 'over' : ''}">${fmtHrs(hours)} / ${target} hrs</span>`;
+    const track = document.createElement('div'); track.className = 'burn-track';
+    const fill = document.createElement('div'); fill.className = 'burn-fill' + (fillPct >= 100 ? ' done' : isWarn ? ' warn' : ''); fill.style.width = `${fillPct}%`;
+    track.appendChild(fill);
+    const pctEl = document.createElement('div'); pctEl.className = 'burn-pct'; pctEl.textContent = `${Math.round(fillPct)}% of ${target}h target`;
+    card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl); grid.appendChild(card);
+  });
+  section.appendChild(grid);
+}
+
+// ── Targeted updates ─────────────────────────────────────────
+function refreshCells(day) {
+  const { clients, blocks } = day;
+  document.querySelectorAll('#tbody td.client-cell').forEach(cell => {
+    const b = blocks[cell.dataset.time]; const c = clients[+cell.dataset.ci];
+    const isSel = bClient(b) === c; const hasTask = isSel && !!bTaskId(b);
+    cell.className = 'client-cell' + (isSel ? ' sel' : '') + (hasTask ? ' has-task' : '');
+  });
+  document.querySelectorAll('#tbody tr[data-time]').forEach(row => {
+    const b = blocks[row.dataset.time]; const tc = row.querySelector('.total-cell');
+    if (tc) tc.textContent = bClient(b) ? '0.25' : '';
+  });
+  renderFoot(day);
+}
+
+function updateTotalDisplay(day) {
+  const { grand } = calcTotals(day);
+  const el = document.getElementById('totalDisplay');
+  el.textContent = `${grand.toFixed(2)} / 8.0 hrs`; el.className = grand >= 8 ? 'done' : '';
+}
+
+function updateDayInfo() {
+  const n = Object.keys(db).filter(d => Object.keys(db[d]?.blocks || {}).length > 0).length;
+  document.getElementById('dayInfo').textContent = n > 0 ? `${n} day${n !== 1 ? 's' : ''} with entries` : '';
+}
+
+function afterBlockChange(day) {
+  autoFillDescs(day); dbSave();
+  refreshCells(day); updateTotalDisplay(day); renderDescs(day); renderBurnRate();
+}
+
+// ── Task Popover ─────────────────────────────────────────────
+const popoverEl = document.getElementById('taskPopover');
+let popoverOutsideHandler = null;
+
+function showPopover(anchorEl, time, client, day) {
+  hidePopover();
+  const tasks = clientTodos(client).filter(t => !t.done);
+  const custom = getCustomTasks(client);
+  const currentTaskId = bTaskId(day.blocks[time]);
+  const currentOtherText = bOtherText(day.blocks[time]);
+  popoverEl.innerHTML = '';
+
+  const hdr = document.createElement('div'); hdr.className = 'pop-header'; hdr.textContent = client; popoverEl.appendChild(hdr);
+
+  // Regular to-do tasks
+  tasks.forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'pop-opt' + (t.id === currentTaskId ? ' is-sel' : '');
+    btn.textContent = t.task; btn.title = t.task;
+    btn.onclick = () => { setBlock(day, time, client, t.id === currentTaskId ? null : t.id); afterBlockChange(day); hidePopover(); };
+    popoverEl.appendChild(btn);
+  });
+
+  // Custom saved "Other" items
+  if (custom.length) {
+    const s0 = document.createElement('div'); s0.className = 'pop-sep'; popoverEl.appendChild(s0);
+    const ch = document.createElement('div'); ch.className = 'pop-header'; ch.style.fontSize = '10px'; ch.textContent = 'Saved'; popoverEl.appendChild(ch);
+    custom.forEach(text => {
+      const isSel = currentTaskId === '__other__' && currentOtherText === text;
+      const row = document.createElement('div'); row.className = 'pop-saved-row';
+      const btn = document.createElement('button');
+      btn.className = 'pop-opt' + (isSel ? ' is-sel' : '');
+      btn.textContent = text; btn.title = text;
+      btn.onclick = () => { setBlock(day, time, client, '__other__', isSel ? '' : text); afterBlockChange(day); hidePopover(); };
+      const delBtn = document.createElement('button');
+      delBtn.className = 'pop-saved-del'; delBtn.title = 'Remove from saved'; delBtn.textContent = '✕';
+      delBtn.onclick = e => {
+        e.stopPropagation();
+        removeCustomTask(client, text);
+        showPopover(anchorEl, time, client, day);
+      };
+      row.appendChild(btn); row.appendChild(delBtn);
+      popoverEl.appendChild(row);
+    });
+  }
+
+  // Standing meeting options
+  const s1 = document.createElement('div'); s1.className = 'pop-sep'; popoverEl.appendChild(s1);
+  [['__meeting_int__', 'Standing Mtg (Internal)'], ['__meeting_cli__', 'Standing Mtg (Client)']].forEach(([id, label]) => {
+    const btn = document.createElement('button');
+    btn.className = 'pop-opt' + (currentTaskId === id ? ' is-sel' : '');
+    btn.textContent = label;
+    btn.onclick = () => { setBlock(day, time, client, currentTaskId === id ? null : id); afterBlockChange(day); hidePopover(); };
+    popoverEl.appendChild(btn);
+  });
+
+  // Other (freeform — gets saved to custom list)
+  const s2 = document.createElement('div'); s2.className = 'pop-sep'; popoverEl.appendChild(s2);
+  const isUnsavedOther = currentTaskId === '__other__' && currentOtherText && !custom.includes(currentOtherText);
+  const otherBtn = document.createElement('button');
+  otherBtn.className = 'pop-opt' + (isUnsavedOther ? ' is-sel' : '');
+  otherBtn.textContent = isUnsavedOther ? `Other: ${currentOtherText}` : 'Other (new…)';
+  otherBtn.onclick = () => {
+    otherBtn.style.display = 'none';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'padding:6px 10px 8px; display:flex; flex-direction:column; gap:6px;';
+    const lbl = document.createElement('div'); lbl.style.cssText = 'font-size:11px; color:#888;';
+    lbl.textContent = 'Describe task (saved as quick option):';
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.value = isUnsavedOther ? currentOtherText : '';
+    inp.placeholder = 'e.g. team lunch, prep call…';
+    inp.style.cssText = 'border:1px solid #d1d5db; border-radius:4px; padding:5px 8px; font-size:12px; font-family:Arial,sans-serif; width:100%;';
+    const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:6px;';
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.style.cssText = 'flex:1; background:#1b3a5c; color:#fff; border:none; border-radius:4px; padding:5px 0; font-size:12px; cursor:pointer;';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.style.cssText = 'flex:1; background:#f3f4f6; border:1px solid #ddd; border-radius:4px; padding:5px 0; font-size:12px; cursor:pointer;';
+    const doConfirm = () => {
+      const text = inp.value.trim();
+      setBlock(day, time, client, '__other__', text);
+      if (text) addCustomTask(client, text);
+      afterBlockChange(day); hidePopover();
+    };
+    okBtn.onclick = doConfirm;
+    cancelBtn.onclick = () => { wrap.remove(); otherBtn.style.display = ''; };
+    inp.onkeydown = e => { if (e.key === 'Enter') doConfirm(); if (e.key === 'Escape') cancelBtn.click(); };
+    row.appendChild(okBtn); row.appendChild(cancelBtn);
+    wrap.appendChild(lbl); wrap.appendChild(inp); wrap.appendChild(row);
+    popoverEl.appendChild(wrap);
+    setTimeout(() => inp.focus(), 0);
+  };
+  popoverEl.appendChild(otherBtn);
+
+  const sep = document.createElement('div'); sep.className = 'pop-sep'; popoverEl.appendChild(sep);
+  const clearBtn = document.createElement('button');
+  clearBtn.className = 'pop-opt pop-clear'; clearBtn.textContent = '✕  Clear this slot';
+  clearBtn.onclick = () => { delete day.blocks[time]; afterBlockChange(day); hidePopover(); };
+  popoverEl.appendChild(clearBtn);
+
+  if (window.innerWidth <= 640) {
+    popoverEl.classList.add('mobile-sheet');
+    popoverEl.style.left = ''; popoverEl.style.top = '';
+  } else {
+    popoverEl.classList.remove('mobile-sheet');
+    const rect = anchorEl.getBoundingClientRect();
+    const pw = 230;
+    let left = rect.left;
+    if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    popoverEl.style.left = `${Math.max(4, left)}px`;
+    popoverEl.style.top = `${rect.bottom + 4}px`;
+  }
+  popoverEl.style.display = 'block';
+
+  setTimeout(() => {
+    popoverOutsideHandler = e => { if (!popoverEl.contains(e.target)) hidePopover(); };
+    document.addEventListener('click', popoverOutsideHandler);
+  }, 0);
+}
+
+function hidePopover() {
+  popoverEl.style.display = 'none';
+  popoverEl.classList.remove('mobile-sheet');
+  if (popoverOutsideHandler) { document.removeEventListener('click', popoverOutsideHandler); popoverOutsideHandler = null; }
+}
+
+// ── Drag-to-fill ─────────────────────────────────────────────
+let drag = null;
+let dragStartXY = null;
+const tbody = document.getElementById('tbody');
+
+tbody.addEventListener('mousedown', e => {
+  const cell = e.target.closest('.client-cell');
+  if (!cell || e.button !== 0) return;
+  e.preventDefault();
+  dragStartXY = { x: e.clientX, y: e.clientY };
+  drag = { ci: +cell.dataset.ci, startTime: cell.dataset.time, startCell: cell, moved: false };
+});
+
+document.addEventListener('mousemove', e => {
+  if (!drag || drag.moved) return;
+  if (Math.abs(e.clientX - dragStartXY.x) + Math.abs(e.clientY - dragStartXY.y) > 5) {
+    drag.moved = true;
+    const day = getDay(currentDate);
+    drag.client = day.clients[drag.ci];
+    const _sb = day.blocks[drag.startTime];
+    const _sbMatch = bClient(_sb) === drag.client;
+    drag.taskId = _sbMatch ? bTaskId(_sb) : null;
+    drag.otherText = _sbMatch ? bOtherText(_sb) : '';
+    tbody.classList.add('dragging');
+    hidePopover();
+    paintCell(drag.startCell, drag.startTime, day);
+    renderFoot(day); updateTotalDisplay(day);
+  }
+});
+
+tbody.addEventListener('mouseover', e => {
+  if (!drag || !drag.moved) return;
+  const cell = e.target.closest('.client-cell');
+  if (!cell || +cell.dataset.ci !== drag.ci) return;
+  const day = getDay(currentDate);
+  paintCell(cell, cell.dataset.time, day);
+  renderFoot(day); updateTotalDisplay(day);
+});
+
+document.addEventListener('mouseup', e => {
+  if (!drag) return;
+  const d = drag; drag = null; dragStartXY = null;
+  tbody.classList.remove('dragging');
+  const day = getDay(currentDate);
+
+  if (!d.moved) {
+    const client = day.clients[d.ci];
+    const existingClient = bClient(day.blocks[d.startTime]);
+    if (existingClient !== client) {
+      setBlock(day, d.startTime, client, null);
+      autoFillDescs(day); dbSave();
+      refreshCells(day); updateTotalDisplay(day); renderDescs(day); renderBurnRate();
+    }
+    showPopover(d.startCell, d.startTime, client, day);
+  } else {
+    autoFillDescs(day); dbSave();
+    renderDescs(day); renderBurnRate();
+  }
+});
+
+// Touch drag-to-fill (mirrors mouse logic above)
+tbody.addEventListener('touchstart', e => {
+  const cell = e.target.closest('.client-cell');
+  if (!cell) return;
+  e.preventDefault();
+  dragStartXY = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  drag = { ci: +cell.dataset.ci, startTime: cell.dataset.time, startCell: cell, moved: false };
+}, { passive: false });
+
+document.addEventListener('touchmove', e => {
+  if (!drag) return;
+  const touch = e.touches[0];
+  if (!drag.moved) {
+    if (Math.abs(touch.clientX - dragStartXY.x) + Math.abs(touch.clientY - dragStartXY.y) > 8) {
+      drag.moved = true;
+      const day = getDay(currentDate);
+      drag.client = day.clients[drag.ci];
+      const _sb = day.blocks[drag.startTime];
+      const sbMatch = bClient(_sb) === drag.client;
+      drag.taskId = sbMatch ? bTaskId(_sb) : null;
+      drag.otherText = sbMatch ? bOtherText(_sb) : '';
+      tbody.classList.add('dragging');
+      hidePopover();
+      paintCell(drag.startCell, drag.startTime, day);
+      renderFoot(day); updateTotalDisplay(day);
+    }
+  }
+  if (drag.moved) {
+    e.preventDefault();
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cell = el?.closest('.client-cell');
+    if (cell && +cell.dataset.ci === drag.ci) {
+      const day = getDay(currentDate);
+      paintCell(cell, cell.dataset.time, day);
+      renderFoot(day); updateTotalDisplay(day);
+    }
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  if (!drag) return;
+  const d = drag; drag = null; dragStartXY = null;
+  tbody.classList.remove('dragging');
+  const day = getDay(currentDate);
+  if (!d.moved) {
+    const client = day.clients[d.ci];
+    const existingClient = bClient(day.blocks[d.startTime]);
+    if (existingClient !== client) {
+      setBlock(day, d.startTime, client, null);
+      autoFillDescs(day); dbSave();
+      refreshCells(day); updateTotalDisplay(day); renderDescs(day); renderBurnRate();
+    }
+    showPopover(d.startCell, d.startTime, client, day);
+  } else {
+    autoFillDescs(day); dbSave();
+    renderDescs(day); renderBurnRate();
+  }
+});
+
+function paintCell(cell, time, day) {
+  setBlock(day, time, drag.client, drag.taskId, drag.otherText || '');
+  cell.className = 'client-cell sel' + (drag.taskId ? ' has-task' : '');
+  const tc = cell.closest('tr')?.querySelector('.total-cell');
+  if (tc) tc.textContent = '0.25';
+}
+
+// ── Actions ──────────────────────────────────────────────────
+function removeClient(idx) {
+  const day = getDay(currentDate); const name = day.clients[idx];
+  if (!confirm(`Remove "${name}" from ${currentDate}?`)) return;
+  day.clients.splice(idx, 1);
+  SLOTS.forEach(s => { if (bClient(day.blocks[s.time]) === name) delete day.blocks[s.time]; });
+  delete day.descriptions[name]; delete day.descManual[name];
+  dbSave(); renderAll();
+  if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
+}
+
+function addClient() {
+  const name = (prompt('Client / project name:') || '').trim(); if (!name) return;
+  const day = getDay(currentDate);
+  if (day.clients.includes(name)) { alert(`"${name}" already exists.`); return; }
+  day.clients.push(name); dbSave(); renderAll();
+  if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
+}
+
+function clearDay() {
+  if (!confirm(`Clear all time entries for ${currentDate}?`)) return;
+  const day = getDay(currentDate); day.blocks = {}; day.descManual = {};
+  dbSave(); renderAll();
+}
+
+function exportCSV() {
+  const day = getDay(currentDate); const totals = calcTotals(day);
+  const header = ['Time', ...day.clients, 'Task', 'Total (hrs)'];
+  const rows = SLOTS.map(s => {
+    const b = day.blocks[s.time]; const selC = bClient(b); const selT = bTaskId(b);
+    const taskName = !selT ? '' : selT === '__other__' ? 'Other' : (findTask(selC, selT)?.task || '');
+    return [s.label, ...day.clients.map(c => selC === c ? 1 : 0), taskName, selC ? 0.25 : 0];
+  });
+  const sumsRow = ['SUMS', ...day.clients.map(c => (totals.byClient[c]||0).toFixed(2)), '', totals.grand.toFixed(2)];
+  const csv = [header, ...rows, sumsRow].map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `time-tracker-${currentDate}.csv`; a.click();
+}
+
+// ── To-Do Tab ────────────────────────────────────────────────
+const TODO_EXCLUDED = new Set(['Flex']);
+
+function allTodoGroups() {
+  const day = getDay(currentDate); const groups = new Set();
+  day.clients.forEach(c => { if (!TODO_EXCLUDED.has(c)) groups.add(getTodoGroup(c)); });
+  Object.keys(todos).forEach(g => { if (!TODO_EXCLUDED.has(g)) groups.add(g); });
+  return [...groups];
+}
+
+function renderTodosTab() {
+  const groups = allTodoGroups();
+  if (!activeTodoGroup || (activeTodoGroup !== '__all__' && !groups.includes(activeTodoGroup))) {
+    activeTodoGroup = groups[0] || null;
+  }
+  const pillsEl = document.getElementById('todoClientPills'); pillsEl.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'todo-pill' + (activeTodoGroup === '__all__' ? ' active' : '');
+  allBtn.textContent = 'All Clients';
+  allBtn.onclick = () => { activeTodoGroup = '__all__'; renderTodosTab(); };
+  pillsEl.appendChild(allBtn);
+  groups.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'todo-pill' + (g === activeTodoGroup ? ' active' : '');
+    btn.textContent = g; btn.onclick = () => { activeTodoGroup = g; renderTodosTab(); };
+    pillsEl.appendChild(btn);
+  });
+  if (activeTodoGroup) renderTodoList(activeTodoGroup);
+}
+
+function renderTodoList(group) {
+  const isAll = group === '__all__';
+  const container = document.getElementById('todoContent'); container.innerHTML = '';
+  const today = todayStr();
+
+  if (!isAll) {
+    const h3 = document.createElement('h3'); h3.textContent = group; container.appendChild(h3);
+    if (group === 'Hershey') {
+      const sub = document.createElement('p'); sub.className = 'todo-subtitle';
+      sub.textContent = "Shared list for: HSY Tier 1/2/3, HSY Dot's, HSY Issues Mgmt, HSY Corp Storytelling, HSY Program MGMT, Reese's";
+      container.appendChild(sub);
+    }
+  }
+
+  // Sort bar
+  const sortBar = document.createElement('div'); sortBar.className = 'todo-sort-bar';
+  sortBar.appendChild(document.createTextNode('Sort by:'));
+  [['date', 'Due Date'], ['priority', 'Priority']].forEach(([mode, label]) => {
+    const btn = document.createElement('button');
+    btn.className = 'todo-sort-btn' + (todoSortMode === mode ? ' active' : '');
+    btn.textContent = label;
+    btn.onclick = () => { todoSortMode = mode; renderTodoList(group); };
+    sortBar.appendChild(btn);
+  });
+  container.appendChild(sortBar);
+
+  // Gather tasks
+  let rows = [];
+  if (isAll) {
+    allTodoGroups().forEach(g => clientTodos(g).forEach(t => rows.push({ ...t, _g: g })));
+  } else {
+    rows = clientTodos(group).map(t => ({ ...t, _g: group }));
+  }
+  const incomplete = sortedTasks(rows.filter(t => !t.done));
+  const done = sortedTasks(rows.filter(t => t.done));
+  const allRows = [...incomplete, ...done];
+
+  if (!allRows.length) {
+    const p = document.createElement('p'); p.className = 'todo-empty'; p.textContent = 'No tasks yet.'; container.appendChild(p);
+  } else {
+    const table = document.createElement('table'); table.className = 'todo-table';
+    const colHdr = isAll
+      ? `<th style="width:28px"></th><th style="width:90px">Client</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
+      : `<th style="width:28px"></th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`;
+    table.innerHTML = `<thead><tr>${colHdr}</tr></thead>`;
+    const tBody = document.createElement('tbody');
+
+    allRows.forEach(task => {
+      const g = task._g;
+      const tr = document.createElement('tr'); if (task.done) tr.className = 'done-row';
+
+      const tdCb = document.createElement('td'); const cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'done-check'; cb.checked = task.done;
+      cb.onchange = () => { toggleDone(g, task.id); renderTodoList(group); renderBody(getDay(currentDate)); };
+      tdCb.appendChild(cb); tr.appendChild(tdCb);
+
+      if (isAll) {
+        const tdG = document.createElement('td'); tdG.style.cssText = 'font-size:11px; color:#666;';
+        tdG.textContent = g; tr.appendChild(tdG);
+      }
+
+      const tdTask = document.createElement('td'); const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'todo-task-inp'; inp.value = task.task;
+      inp.onchange = () => updateTaskField(g, task.id, 'task', inp.value);
+      tdTask.appendChild(inp); tr.appendChild(tdTask);
+
+      const tdPri = document.createElement('td'); const priSel = document.createElement('select');
+      priSel.className = 'todo-priority-sel';
+      PRIORITIES.forEach(p => {
+        const opt = document.createElement('option'); opt.value = p.val; opt.textContent = p.label;
+        if ((task.priority || 0) === p.val) opt.selected = true;
+        priSel.appendChild(opt);
+      });
+      priSel.onchange = () => {
+        updateTaskField(g, task.id, 'priority', +priSel.value);
+        if (todoSortMode === 'priority') renderTodoList(group);
+      };
+      tdPri.appendChild(priSel); tr.appendChild(tdPri);
+
+      const tdDue = document.createElement('td'); const due = document.createElement('input');
+      due.type = 'date'; due.className = 'todo-due-inp'; due.value = task.dueDate || '';
+      if (task.dueDate && task.dueDate < today && !task.done) due.classList.add('overdue');
+      due.onchange = () => {
+        updateTaskField(g, task.id, 'dueDate', due.value);
+        if (todoSortMode === 'date') renderTodoList(group);
+      };
+      tdDue.appendChild(due); tr.appendChild(tdDue);
+
+      const tdTime2 = document.createElement('td'); const timeInp2 = document.createElement('input');
+      timeInp2.type = 'time'; timeInp2.className = 'todo-due-inp'; timeInp2.value = task.dueTime || '';
+      timeInp2.onchange = () => updateTaskField(g, task.id, 'dueTime', timeInp2.value);
+      tdTime2.appendChild(timeInp2); tr.appendChild(tdTime2);
+
+      const tdNotes = document.createElement('td'); const notesInp = document.createElement('input');
+      notesInp.type = 'text'; notesInp.className = 'todo-notes-inp'; notesInp.value = task.notes || '';
+      notesInp.placeholder = 'Add a note…';
+      notesInp.onchange = () => updateTaskField(g, task.id, 'notes', notesInp.value);
+      tdNotes.appendChild(notesInp); tr.appendChild(tdNotes);
+
+      const tdDel = document.createElement('td'); const del = document.createElement('button');
+      del.className = 'todo-del-btn'; del.textContent = '✕';
+      del.onclick = () => {
+        if (!confirm(`Delete "${task.task}"?`)) return;
+        deleteTask(g, task.id); renderTodoList(group);
+        const day = getDay(currentDate); renderBody(day); renderDescs(day);
+      };
+      tdDel.appendChild(del); tr.appendChild(tdDel);
+      tBody.appendChild(tr);
+    });
+    table.appendChild(tBody); container.appendChild(table);
+  }
+
+  if (!isAll) {
+    const addRow = document.createElement('div'); addRow.className = 'add-task-row';
+    const taskInp = document.createElement('input'); taskInp.type = 'text'; taskInp.className = 'add-task-inp'; taskInp.placeholder = 'New task…';
+    const dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.className = 'add-date-inp';
+    const timeInp = document.createElement('input'); timeInp.type = 'time'; timeInp.className = 'add-date-inp';
+    const addBtn = document.createElement('button'); addBtn.className = 'add-task-btn'; addBtn.textContent = '+ Add';
+    addBtn.onclick = () => {
+      const text = taskInp.value.trim(); if (!text) { taskInp.focus(); return; }
+      addTask(group, text, dateInp.value, timeInp.value); taskInp.value = ''; dateInp.value = ''; timeInp.value = '';
+      renderTodoList(group); renderBody(getDay(currentDate));
+    };
+    taskInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
+    addRow.appendChild(taskInp); addRow.appendChild(dateInp); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
+    container.appendChild(addRow);
+  }
+}
+
+// ── Home Tab ─────────────────────────────────────────────────
+function renderHomeTab() {
+  const section = document.getElementById('homeSection'); section.innerHTML = '';
+  const today = todayStr();
+  const cutoff = new Date(today + 'T12:00:00'); cutoff.setDate(cutoff.getDate() + 7);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+
+  const overdue = [], dueToday = [], highPri = [], upcoming = [];
+  allTodoGroups().forEach(g => {
+    clientTodos(g).filter(t => !t.done).forEach(t => {
+      const item = { ...t, group: g };
+      if (t.dueDate && t.dueDate < today) overdue.push(item);
+      else if (t.dueDate === today) dueToday.push(item);
+      else if (t.dueDate && t.dueDate <= cutoffStr) upcoming.push(item);
+      if ((t.priority || 0) === 1 && (!t.dueDate || t.dueDate > today)) highPri.push(item);
+    });
+  });
+  overdue.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  dueToday.sort((a, b) => (a.dueTime || '').localeCompare(b.dueTime || ''));
+  upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || (a.priority || 9) - (b.priority || 9));
+
+  const grid = document.createElement('div'); grid.className = 'home-grid';
+  grid.appendChild(makeHomePanel('Overdue', overdue, 'overdue', today));
+  grid.appendChild(makeHomePanel('Due Today', dueToday, 'today', today));
+  grid.appendChild(makeHomePanel('High Priority', highPri, 'high', today));
+  grid.appendChild(makeHomePanel('Upcoming (7 days)', upcoming, 'upcoming', today));
+  section.appendChild(grid);
+
+  // Today's time log summary
+  const day = getDay(currentDate);
+  const totals = calcTotals(day);
+  const sumPanel = document.createElement('div'); sumPanel.className = 'home-panel home-time-log';
+  const sh = document.createElement('h2'); sh.textContent = `Time Log — ${currentDate}`; sumPanel.appendChild(sh);
+  const hasTotals = Object.values(totals.byClient).some(v => v > 0);
+  if (!hasTotals) {
+    const p = document.createElement('p'); p.className = 'home-empty'; p.textContent = 'No time logged today.'; sumPanel.appendChild(p);
+  } else {
+    day.clients.filter(c => totals.byClient[c] > 0).forEach(c => {
+      const row = document.createElement('div'); row.className = 'home-time-row';
+      row.innerHTML = `<span>${esc(c)}</span><span style="font-weight:bold">${(totals.byClient[c] || 0).toFixed(2)} hrs</span>`;
+      sumPanel.appendChild(row);
+    });
+    const tot = document.createElement('p'); tot.className = 'home-time-total';
+    tot.textContent = `Total: ${totals.grand.toFixed(2)} / 8.0 hrs`; sumPanel.appendChild(tot);
+  }
+  section.appendChild(sumPanel);
+}
+
+function makeHomePanel(title, tasks, type, today) {
+  const panel = document.createElement('div'); panel.className = 'home-panel';
+  const h2 = document.createElement('h2'); h2.textContent = title; panel.appendChild(h2);
+  if (!tasks.length) {
+    const p = document.createElement('p'); p.className = 'home-empty';
+    p.textContent = type === 'overdue' ? 'All clear!' : 'Nothing here.'; panel.appendChild(p);
+  } else {
+    tasks.slice(0, 10).forEach(t => {
+      const row = document.createElement('div'); row.className = 'home-task-item';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'home-done-cb';
+      cb.onchange = () => { toggleDone(t.group, t.id); renderHomeTab(); };
+      const grp = document.createElement('span'); grp.className = 'home-task-group'; grp.textContent = t.group;
+      const txt = document.createElement('span'); txt.className = 'home-task-text'; txt.textContent = t.task;
+      row.appendChild(cb); row.appendChild(grp); row.appendChild(txt);
+      const pri = t.priority || 0;
+      if (pri === 1) { const b = document.createElement('span'); b.className = 'priority-badge priority-high'; b.textContent = 'High'; row.appendChild(b); }
+      else if (pri === 2) { const b = document.createElement('span'); b.className = 'priority-badge priority-med'; b.textContent = 'Med'; row.appendChild(b); }
+      if (t.dueDate) {
+        const d = new Date(t.dueDate + 'T12:00:00');
+        const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const dueEl = document.createElement('span');
+        dueEl.className = 'home-task-due' + (t.dueDate < today ? ' overdue' : t.dueDate === today ? ' today-due' : '');
+        dueEl.textContent = t.dueTime ? `${label} ${t.dueTime}` : label;
+        row.appendChild(dueEl);
+      }
+      panel.appendChild(row);
+    });
+    if (tasks.length > 10) {
+      const more = document.createElement('p'); more.className = 'home-more';
+      more.textContent = `+${tasks.length - 10} more`; panel.appendChild(more);
+    }
+  }
+  return panel;
+}
+
+// ── Settings Tab ─────────────────────────────────────────────
+let settingsDragSrcIdx = null;
+
+function renderSettings() {
+  renderSettingsClients();
+  renderSettingsBurnRates();
+  renderSyncPanel();
+}
+
+function renderSettingsClients() {
+  const list = document.getElementById('settingsClientList');
+  list.innerHTML = '';
+
+  config.defaultClients.forEach((c, i) => {
+    const item = document.createElement('div');
+    item.className = 'settings-client-item';
+    item.draggable = true;
+    item.dataset.idx = i;
+
+    const handle = document.createElement('span');
+    handle.className = 'drag-handle';
+    handle.innerHTML = '&#8942;&#8942;'; // vertical dots as drag indicator
+    item.appendChild(handle);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'settings-client-name';
+    nameSpan.textContent = c;
+    item.appendChild(nameSpan);
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 's-icon-btn';
+    editBtn.title = 'Rename';
+    editBtn.textContent = 'Rename';
+    editBtn.onclick = () => startEditClient(i, item, nameSpan);
+    item.appendChild(editBtn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 's-icon-btn del';
+    delBtn.title = 'Remove from defaults';
+    delBtn.textContent = 'Remove';
+    delBtn.onclick = () => deleteSettingsClient(i);
+    item.appendChild(delBtn);
+
+    item.addEventListener('dragstart', e => {
+      settingsDragSrcIdx = i;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => item.classList.add('dragging-src'), 0);
+    });
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging-src');
+      list.querySelectorAll('.settings-client-item').forEach(el => el.classList.remove('drag-over'));
+    });
+    item.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      list.querySelectorAll('.settings-client-item').forEach(el => el.classList.remove('drag-over'));
+      item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+    item.addEventListener('drop', e => {
+      e.preventDefault();
+      item.classList.remove('drag-over');
+      const destIdx = +item.dataset.idx;
+      if (settingsDragSrcIdx !== null && settingsDragSrcIdx !== destIdx) {
+        const [moved] = config.defaultClients.splice(settingsDragSrcIdx, 1);
+        config.defaultClients.splice(destIdx, 0, moved);
+        configSave();
+        renderSettingsClients();
+      }
+    });
+
+    list.appendChild(item);
+  });
+}
+
+function startEditClient(idx, item, nameSpan) {
+  const oldName = config.defaultClients[idx];
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.className = 'settings-client-name-inp';
+  inp.value = oldName;
+  nameSpan.replaceWith(inp);
+
+  // hide edit button while editing
+  const editBtn = item.querySelector('.s-icon-btn:not(.del)');
+  if (editBtn) editBtn.style.display = 'none';
+
+  inp.focus(); inp.select();
+
+  const save = () => {
+    const newName = inp.value.trim();
+    if (editBtn) editBtn.style.display = '';
+    if (!newName || newName === oldName) { renderSettingsClients(); return; }
+    if (config.defaultClients.some((c, j) => c === newName && j !== idx)) {
+      alert(`"${newName}" already exists.`);
+      inp.focus(); return;
+    }
+    const renameAll = confirm(`Rename "${oldName}" to "${newName}" across all tracked days too?`);
+    if (renameAll) {
+      Object.values(db).forEach(day => {
+        const ci = day.clients.indexOf(oldName);
+        if (ci !== -1) day.clients[ci] = newName;
+        Object.keys(day.blocks).forEach(t => { if (bClient(day.blocks[t]) === oldName) day.blocks[t].client = newName; });
+        if (day.descriptions[oldName] !== undefined) { day.descriptions[newName] = day.descriptions[oldName]; delete day.descriptions[oldName]; }
+        if (day.descManual[oldName] !== undefined) { day.descManual[newName] = day.descManual[oldName]; delete day.descManual[oldName]; }
+      });
+      config.burnRates.forEach(r => {
+        const ci = r.clients.indexOf(oldName);
+        if (ci !== -1) r.clients[ci] = newName;
+      });
+      dbSave();
+    }
+    config.defaultClients[idx] = newName;
+    configSave();
+    renderSettingsClients();
+    renderSettingsBurnRates();
+    if (document.getElementById('tab-tracker').classList.contains('active')) renderAll();
+  };
+
+  inp.onblur = save;
+  inp.onkeydown = e => {
+    if (e.key === 'Enter') { inp.onblur = null; save(); }
+    if (e.key === 'Escape') { inp.onblur = null; renderSettingsClients(); }
+  };
+}
+
+function deleteSettingsClient(idx) {
+  const name = config.defaultClients[idx];
+  if (!confirm(`Remove "${name}" from the default client list?\n\nThis won't delete it from days where it's already added.`)) return;
+  config.defaultClients.splice(idx, 1);
+  config.burnRates.forEach(r => { r.clients = r.clients.filter(c => c !== name); });
+  configSave();
+  renderSettingsClients();
+  renderSettingsBurnRates();
+}
+
+function renderSettingsBurnRates() {
+  const container = document.getElementById('settingsBurnRates');
+  container.innerHTML = '';
+
+  // Collect any clients assigned to burn rate groups but not in defaultClients
+  // so we can still show them as assigned (orphaned) even though they're not in the default list
+  const allKnownClients = new Set(config.defaultClients);
+  config.burnRates.forEach(r => r.clients.forEach(c => allKnownClients.add(c)));
+
+  config.burnRates.forEach((rate, ri) => {
+    const card = document.createElement('div');
+    card.className = 'settings-br-card';
+
+    // Header row
+    const hdr = document.createElement('div');
+    hdr.className = 'settings-br-header';
+
+    const nameInp = document.createElement('input');
+    nameInp.type = 'text';
+    nameInp.className = 'settings-br-name';
+    nameInp.value = rate.label;
+    nameInp.placeholder = 'Group name';
+    nameInp.onchange = () => {
+      const v = nameInp.value.trim();
+      if (v) { config.burnRates[ri].label = v; configSave(); renderBurnRate(); }
+    };
+    hdr.appendChild(nameInp);
+
+    const targetGroup = document.createElement('div');
+    targetGroup.className = 'br-target-group';
+    targetGroup.appendChild(Object.assign(document.createElement('span'), { textContent: 'Target:' }));
+    const targetInp = document.createElement('input');
+    targetInp.type = 'number';
+    targetInp.className = 'settings-br-target';
+    targetInp.value = rate.target;
+    targetInp.min = 1; targetInp.max = 999; targetInp.step = 1;
+    targetInp.onchange = () => {
+      const v = parseFloat(targetInp.value);
+      if (!isNaN(v) && v > 0) { config.burnRates[ri].target = v; configSave(); renderBurnRate(); }
+    };
+    targetGroup.appendChild(targetInp);
+    targetGroup.appendChild(Object.assign(document.createElement('span'), { textContent: 'hrs / mo' }));
+    hdr.appendChild(targetGroup);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'ctrl-btn danger settings-br-del';
+    delBtn.textContent = 'Remove Group';
+    delBtn.onclick = () => {
+      if (!confirm(`Remove burn rate group "${rate.label}"?`)) return;
+      config.burnRates.splice(ri, 1);
+      configSave();
+      renderSettingsBurnRates();
+      renderBurnRate();
+    };
+    hdr.appendChild(delBtn);
+    card.appendChild(hdr);
+
+    // Client assignment
+    const lbl = document.createElement('div');
+    lbl.className = 'settings-br-lbl';
+    lbl.textContent = 'Assigned Clients:';
+    card.appendChild(lbl);
+
+    const grid = document.createElement('div');
+    grid.className = 'client-checkbox-grid';
+
+    // Show default clients first, then any orphaned clients
+    const displayClients = [
+      ...config.defaultClients,
+      ...[...allKnownClients].filter(c => !config.defaultClients.includes(c))
+    ];
+
+    if (!displayClients.length) {
+      grid.appendChild(Object.assign(document.createElement('span'), { className: 'br-no-clients', textContent: 'No clients defined — add some in Default Client List above.' }));
+    } else {
+      displayClients.forEach(c => {
+        const isChecked = rate.clients.includes(c);
+        const pill = document.createElement('label');
+        pill.className = 'client-cb-pill' + (isChecked ? ' checked' : '');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = isChecked;
+        cb.onchange = () => {
+          if (cb.checked) {
+            if (!config.burnRates[ri].clients.includes(c)) config.burnRates[ri].clients.push(c);
+          } else {
+            config.burnRates[ri].clients = config.burnRates[ri].clients.filter(x => x !== c);
+          }
+          pill.className = 'client-cb-pill' + (cb.checked ? ' checked' : '');
+          configSave();
+          renderBurnRate();
+        };
+        pill.appendChild(cb);
+        pill.appendChild(document.createTextNode(c));
+        grid.appendChild(pill);
+      });
+    }
+    card.appendChild(grid);
+    container.appendChild(card);
+  });
+}
+
+// ── Sync (GitHub Gist) ───────────────────────────────────────
+const SYNC_STORE_KEY = 'stt_sync';
+let syncCfg = { token: '', gistId: '', lastSync: '', autoSync: true };
+
+function syncCfgLoad() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SYNC_STORE_KEY) || 'null');
+    if (s) { syncCfg.token = s.token || ''; syncCfg.gistId = s.gistId || ''; syncCfg.lastSync = s.lastSync || ''; syncCfg.autoSync = s.autoSync !== false; }
+  } catch {}
+}
+function syncCfgSave() { localStorage.setItem(SYNC_STORE_KEY, JSON.stringify(syncCfg)); }
+
+function packAllData() {
+  return JSON.stringify({ v: 1, stt_v1: db, stt_todos: todos, stt_custom: customTasks, stt_config: config, exportedAt: new Date().toISOString() }, null, 2);
+}
+
+function unpackAllData(json) {
+  const d = JSON.parse(json);
+  if (d.stt_v1 && typeof d.stt_v1 === 'object') { db = d.stt_v1; dbSave(); }
+  if (d.stt_todos && typeof d.stt_todos === 'object') { todos = d.stt_todos; todosSave(); }
+  if (d.stt_custom && typeof d.stt_custom === 'object') { customTasks = d.stt_custom; customSave(); }
+  if (d.stt_config?.defaultClients && d.stt_config?.burnRates) { config = d.stt_config; configSave(); }
+}
+
+const GIST_FILENAME = 'sam-time-tracker.json';
+
+async function gistPush() {
+  const { token, gistId } = syncCfg;
+  if (!token) throw new Error('Enter a GitHub Personal Access Token first.');
+  const payload = {
+    description: 'SAM TIME TRACKER sync data',
+    public: false,
+    files: { [GIST_FILENAME]: { content: packAllData() } }
+  };
+  const url = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists';
+  const resp = await fetch(url, {
+    method: gistId ? 'PATCH' : 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`GitHub ${resp.status}: ${t.slice(0, 200)}`); }
+  const result = await resp.json();
+  if (!gistId) syncCfg.gistId = result.id;
+  syncCfg.lastSync = new Date().toISOString();
+  syncCfgSave();
+  return syncCfg.gistId;
+}
+
+async function gistPull() {
+  const { token, gistId } = syncCfg;
+  if (!token) throw new Error('Enter a GitHub Personal Access Token first.');
+  if (!gistId) throw new Error('No Gist ID set — push data first, or enter an existing Gist ID.');
+  const resp = await fetch(`https://api.github.com/gists/${gistId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!resp.ok) { const t = await resp.text(); throw new Error(`GitHub ${resp.status}: ${t.slice(0, 200)}`); }
+  const result = await resp.json();
+  const content = result.files?.[GIST_FILENAME]?.content;
+  if (!content) throw new Error(`File "${GIST_FILENAME}" not found in Gist.`);
+  unpackAllData(content);
+  syncCfg.lastSync = new Date().toISOString();
+  syncCfgSave();
+}
+
+// Auto-sync helpers
+function flashSync(msg, isErr) {
+  const el = document.getElementById('syncIndicator');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = isErr ? 'sync-err show' : 'show';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.className = ''; }, 4000);
+}
+
+async function autoSyncOnLoad() {
+  if (!syncCfg.token || !syncCfg.gistId || !syncCfg.autoSync) return;
+  try {
+    await gistPull();
+    renderAll();
+    flashSync('Synced');
+  } catch {
+    flashSync('Sync failed', true);
+  }
+}
+
+function autoSyncOnHide() {
+  if (!syncCfg.token || !syncCfg.gistId || !syncCfg.autoSync) return;
+  const payload = JSON.stringify({
+    files: { [GIST_FILENAME]: { content: packAllData() } }
+  });
+  fetch(`https://api.github.com/gists/${syncCfg.gistId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${syncCfg.token}`, 'Content-Type': 'application/json' },
+    body: payload,
+    keepalive: true,
+  }).catch(() => {});
+  syncCfg.lastSync = new Date().toISOString();
+  syncCfgSave();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') autoSyncOnHide();
+});
+
+function renderSyncPanel() {
+  const panel = document.getElementById('syncPanel');
+  panel.className = 'settings-panel';
+  panel.innerHTML = '';
+
+  const h2 = document.createElement('h2'); h2.textContent = 'Cross-Device Sync'; panel.appendChild(h2);
+  const desc = document.createElement('p'); desc.className = 'settings-desc';
+  desc.innerHTML = 'Sync all data to a private GitHub Gist. Requires a GitHub account and a Personal Access Token with the <strong>gist</strong> scope. Set this up on each device using the same token and Gist ID.';
+  panel.appendChild(desc);
+
+  // Token field
+  const tokLbl = document.createElement('label'); tokLbl.className = 'sync-field-lbl';
+  tokLbl.textContent = 'GitHub Personal Access Token';
+  const tokInp = document.createElement('input'); tokInp.type = 'password';
+  tokInp.className = 'settings-text-inp'; tokInp.placeholder = 'ghp_…'; tokInp.value = syncCfg.token;
+  tokInp.oninput = () => { syncCfg.token = tokInp.value.trim(); syncCfgSave(); };
+  tokLbl.appendChild(tokInp); panel.appendChild(tokLbl);
+
+  // Gist ID field
+  const gistLbl = document.createElement('label'); gistLbl.className = 'sync-field-lbl';
+  gistLbl.textContent = 'Gist ID (auto-filled after first push — copy this to other devices)';
+  const gistInp = document.createElement('input'); gistInp.type = 'text';
+  gistInp.className = 'settings-text-inp'; gistInp.placeholder = 'Leave blank to create a new Gist'; gistInp.value = syncCfg.gistId;
+  gistInp.oninput = () => { syncCfg.gistId = gistInp.value.trim(); syncCfgSave(); };
+  gistLbl.appendChild(gistInp); panel.appendChild(gistLbl);
+
+  // Status line
+  const statusEl = document.createElement('p'); statusEl.className = 'sync-status';
+  statusEl.textContent = syncCfg.lastSync ? `Last synced: ${new Date(syncCfg.lastSync).toLocaleString()}` : '';
+
+  // Buttons
+  const btnRow = document.createElement('div'); btnRow.className = 'settings-actions'; btnRow.style.marginTop = '12px';
+
+  const pushBtn = document.createElement('button'); pushBtn.className = 'ctrl-btn primary'; pushBtn.textContent = '↑ Push to Gist';
+  pushBtn.onclick = async () => {
+    pushBtn.disabled = pullBtn.disabled = true;
+    statusEl.textContent = 'Pushing…'; statusEl.className = 'sync-status';
+    try {
+      const id = await gistPush();
+      gistInp.value = id;
+      statusEl.textContent = `Pushed. Gist ID: ${id}  |  ${new Date(syncCfg.lastSync).toLocaleString()}`;
+      statusEl.className = 'sync-status sync-ok';
+    } catch (e) {
+      statusEl.textContent = `Push failed: ${e.message}`;
+      statusEl.className = 'sync-status sync-err';
+    }
+    pushBtn.disabled = pullBtn.disabled = false;
+  };
+
+  const pullBtn = document.createElement('button'); pullBtn.className = 'ctrl-btn'; pullBtn.textContent = '↓ Pull from Gist';
+  pullBtn.onclick = async () => {
+    if (!confirm('Pull from Gist? This will replace your local data with the remote version.')) return;
+    pushBtn.disabled = pullBtn.disabled = true;
+    statusEl.textContent = 'Pulling…'; statusEl.className = 'sync-status';
+    try {
+      await gistPull();
+      statusEl.textContent = `Pulled successfully  |  ${new Date(syncCfg.lastSync).toLocaleString()}`;
+      statusEl.className = 'sync-status sync-ok';
+      renderAll();
+      if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
+      if (document.getElementById('tab-home').classList.contains('active')) renderHomeTab();
+      renderSyncPanel();
+    } catch (e) {
+      statusEl.textContent = `Pull failed: ${e.message}`;
+      statusEl.className = 'sync-status sync-err';
+    }
+    pushBtn.disabled = pullBtn.disabled = false;
+  };
+
+  btnRow.appendChild(pushBtn); btnRow.appendChild(pullBtn);
+  panel.appendChild(btnRow); panel.appendChild(statusEl);
+
+  // Auto-sync toggle
+  const autoRow = document.createElement('label');
+  autoRow.style.cssText = 'display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:#555; cursor:pointer;';
+  const autoCb = document.createElement('input'); autoCb.type = 'checkbox'; autoCb.checked = syncCfg.autoSync;
+  autoCb.style.cssText = 'accent-color:#1b3a5c; width:15px; height:15px;';
+  autoCb.onchange = () => { syncCfg.autoSync = autoCb.checked; syncCfgSave(); };
+  autoRow.appendChild(autoCb);
+  autoRow.appendChild(document.createTextNode('Auto-sync: pull on startup, push when leaving'));
+  panel.appendChild(autoRow);
+}
+
+// ── Event Delegation ─────────────────────────────────────────
+
+document.getElementById('thead').addEventListener('click', e => {
+  const btn = e.target.closest('.rm-btn'); if (btn) removeClient(+btn.dataset.i);
+});
+
+document.getElementById('descRows').addEventListener('input', e => {
+  const ta = e.target.closest('.desc-textarea'); if (!ta) return;
+  const day = getDay(currentDate); const c = day.clients[+ta.dataset.ci];
+  day.descriptions[c] = ta.value; day.descManual[c] = true;
+  ta.classList.remove('auto-mode'); dbSave();
+  const countEl = ta.nextElementSibling;
+  if (countEl) { countEl.textContent = `${ta.value.length}/125`; countEl.className = 'char-count' + (ta.value.length > 125 ? ' over' : ''); }
+  ta.classList.toggle('over-limit', ta.value.length > 125);
+});
+
+document.getElementById('descRows').addEventListener('click', e => {
+  const btn = e.target.closest('.regen-btn'); if (!btn) return;
+  const day = getDay(currentDate); const ci = +btn.dataset.ci; const c = day.clients[ci];
+  day.descManual[c] = false; day.descriptions[c] = generateDesc(c, day); dbSave();
+  const ta = document.querySelector(`#descRows .desc-textarea[data-ci="${ci}"]`);
+  if (ta) {
+    ta.value = day.descriptions[c]; ta.className = 'desc-textarea auto-mode';
+    const ce = ta.nextElementSibling;
+    if (ce) { ce.textContent = `${day.descriptions[c].length}/125`; ce.className = 'char-count' + (day.descriptions[c].length > 125 ? ' over' : ''); }
+    ta.classList.toggle('over-limit', day.descriptions[c].length > 125);
+  }
+});
+
+document.getElementById('appTabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.app-tab-btn'); if (!btn) return;
+  const tab = btn.dataset.tab; hidePopover();
+  document.querySelectorAll('.app-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === `tab-${tab}`));
+  if (tab === 'home') renderHomeTab();
+  if (tab === 'todos') renderTodosTab();
+  if (tab === 'settings') renderSettings();
+});
+
+// Range expand/collapse
+document.getElementById('earlierBtn').addEventListener('click', () => {
+  rangeStart = Math.max(0, rangeStart - 60); updateRangeDisplay(); renderBody(getDay(currentDate));
+});
+document.getElementById('laterBtn').addEventListener('click', () => {
+  rangeEnd = Math.min(1440, rangeEnd + 60); updateRangeDisplay(); renderBody(getDay(currentDate));
+});
+document.getElementById('rangeDisplay').addEventListener('click', () => {
+  rangeStart = 8 * 60; rangeEnd = 19 * 60; updateRangeDisplay(); renderBody(getDay(currentDate));
+});
+
+// Navigation
+function navTo(date) { hidePopover(); currentDate = date; renderAll(); }
+document.getElementById('prevBtn').onclick = () => navTo(offsetDate(currentDate, -1));
+document.getElementById('nextBtn').onclick = () => navTo(offsetDate(currentDate, 1));
+document.getElementById('todayBtn').onclick = () => navTo(todayStr());
+document.getElementById('dateInput').onchange = e => navTo(e.target.value);
+
+document.getElementById('addClientBtn').onclick = addClient;
+document.getElementById('clearBtn').onclick = clearDay;
+document.getElementById('exportBtn').onclick = exportCSV;
+
+// Settings events
+document.getElementById('addSettingsClientBtn').onclick = () => {
+  const inp = document.getElementById('newClientInp');
+  const name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  if (config.defaultClients.includes(name)) { alert(`"${name}" already exists.`); inp.focus(); return; }
+  config.defaultClients.push(name);
+  configSave();
+  inp.value = '';
+  renderSettingsClients();
+  renderSettingsBurnRates();
+};
+
+document.getElementById('newClientInp').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('addSettingsClientBtn').click();
+});
+
+document.getElementById('addBurnRateBtn').onclick = () => {
+  config.burnRates.push({ id: uid(), label: 'New Group', target: 20, clients: [] });
+  configSave();
+  renderSettingsBurnRates();
+};
+
+document.getElementById('applyClientsToTodayBtn').onclick = () => {
+  const day = getDay(currentDate);
+  let added = 0;
+  config.defaultClients.forEach(c => { if (!day.clients.includes(c)) { day.clients.push(c); added++; } });
+  dbSave();
+  if (added) {
+    if (document.getElementById('tab-tracker').classList.contains('active')) renderAll();
+    alert(`Added ${added} client${added !== 1 ? 's' : ''} to ${currentDate}.`);
+  } else {
+    alert('Today already has all default clients.');
+  }
+};
+
+document.getElementById('applyClientsToAllBtn').onclick = () => {
+  if (!confirm('Add any missing default clients to every tracked day?')) return;
+  let totalAdded = 0;
+  Object.keys(db).forEach(date => {
+    config.defaultClients.forEach(c => { if (!db[date].clients.includes(c)) { db[date].clients.push(c); totalAdded++; } });
+  });
+  dbSave();
+  if (document.getElementById('tab-tracker').classList.contains('active')) renderAll();
+  alert(`Done. Added ${totalAdded} client entries across all days.`);
+};
+
+document.getElementById('resetConfigBtn').onclick = () => {
+  if (!confirm('Reset to original default clients and burn rate groups?\n\nYour tracked time data will not be affected.')) return;
+  config = buildDefaultConfig();
+  configSave();
+  renderSettings();
+  renderBurnRate();
+};
+
+// ── Quotes ───────────────────────────────────────────────────
+const QUOTES = [
+  "You miss 100% of the time blocks you don't fill in.",
+  "Work smarter, not harder. But also harder.",
+  "It's not called procrastination, it's called async time management.",
+  "Another quarter-hour closer to the weekend.",
+  "Hustle culture is a scam — but those 8 hours won't log themselves.",
+  "Behind every great deliverable is a person who triple-checked the hours.",
+  "If you can dream it, you can schedule it.",
+  "Time is money. This app is free. You're welcome.",
+  "Rise and grind. Or just rise. Grinding is optional.",
+  "The early bird gets the billable hours.",
+  "Done is better than perfect, but billable is better than done.",
+  "Live. Laugh. Log your hours.",
+  "You're not behind, you're just pre-ahead.",
+  "A 0.25 here, a 0.25 there — suddenly you have 8 hours.",
+  "Stay hydrated and log your time.",
+  "Deep work: telling yourself you'll do it in 15 minutes, but make it 4 hours.",
+  "Coffee: the original time-tracking fuel.",
+  "Your future self thanks you for filling this in now.",
+  "Today's to-do list is tomorrow's LinkedIn accomplishment.",
+  "Not all heroes wear capes. Some just hit 8.0 hrs.",
+  "If you're seeing this, just know you're crushing it every day.",
+];
+
+let quoteIdx = Math.floor(Math.random() * QUOTES.length);
+const quoteEl = document.getElementById('quoteDisplay');
+
+function showNextQuote(immediate) {
+  if (immediate) {
+    quoteEl.textContent = QUOTES[quoteIdx];
+    return;
+  }
+  quoteEl.classList.add('fade');
+  setTimeout(() => {
+    quoteIdx = (quoteIdx + 1) % QUOTES.length;
+    quoteEl.textContent = QUOTES[quoteIdx];
+    quoteEl.classList.remove('fade');
+  }, 650);
+}
+
+quoteEl.addEventListener('click', () => showNextQuote(false));
+showNextQuote(true);
+setInterval(() => showNextQuote(false), 12000);
+
+// ── Init ─────────────────────────────────────────────────────
+dbLoad(); todosLoad(); customLoad(); syncCfgLoad(); configLoad(); renderAll();
+autoSyncOnLoad();
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+  }
+</script>
+</body>
+</html>

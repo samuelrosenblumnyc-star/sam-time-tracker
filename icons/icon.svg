@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#1b3a5c"/>
+
+  <!-- Time-block grid (4 cols × 3 rows) -->
+  <!-- Row 1 -->
+  <rect x="66" y="108" width="82" height="58" rx="10" fill="white" opacity=".9"/>
+  <rect x="164" y="108" width="82" height="58" rx="10" fill="white" opacity=".22"/>
+  <rect x="262" y="108" width="82" height="58" rx="10" fill="white" opacity=".22"/>
+  <rect x="360" y="108" width="86" height="58" rx="10" fill="#4ade80" opacity=".85"/>
+
+  <!-- Row 2 -->
+  <rect x="66" y="182" width="82" height="58" rx="10" fill="white" opacity=".22"/>
+  <rect x="164" y="182" width="82" height="58" rx="10" fill="white" opacity=".9"/>
+  <rect x="262" y="182" width="82" height="58" rx="10" fill="white" opacity=".9"/>
+  <rect x="360" y="182" width="86" height="58" rx="10" fill="white" opacity=".22"/>
+
+  <!-- Row 3 -->
+  <rect x="66" y="256" width="82" height="58" rx="10" fill="white" opacity=".22"/>
+  <rect x="164" y="256" width="82" height="58" rx="10" fill="white" opacity=".22"/>
+  <rect x="262" y="256" width="82" height="58" rx="10" fill="white" opacity=".9"/>
+  <rect x="360" y="256" width="86" height="58" rx="10" fill="white" opacity=".9"/>
+
+  <!-- "SAM" wordmark -->
+  <text x="256" y="398" font-family="Arial, sans-serif" font-size="62" font-weight="900"
+        fill="white" text-anchor="middle" opacity=".88" letter-spacing="6">SAM</text>
+</svg>

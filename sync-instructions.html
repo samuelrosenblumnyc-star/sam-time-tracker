@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SAM TIME TRACKER — Cross-Device Sync Setup</title>
+  <style>
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none; }
+    }
+    body {
+      font-family: Georgia, serif;
+      max-width: 720px;
+      margin: 48px auto;
+      padding: 0 24px;
+      color: #1e1b18;
+      line-height: 1.6;
+    }
+    header {
+      border-bottom: 2px solid #1b3a5c;
+      padding-bottom: 16px;
+      margin-bottom: 32px;
+    }
+    header p { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #666; }
+    h1 { margin: 6px 0 0; font-size: 26px; color: #1b3a5c; }
+    h2 { font-size: 15px; color: #1b3a5c; border-left: 4px solid #1b3a5c; padding-left: 10px; margin-top: 32px; }
+    ol, ul { padding-left: 20px; }
+    li { margin-bottom: 6px; }
+    code {
+      background: #f0f2f5;
+      border: 1px solid #dde;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+    .step-block {
+      background: #f8fbff;
+      border: 1px solid #bfdbfe;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 16px 0;
+    }
+    .step-block h3 { margin: 0 0 10px; font-size: 13px; color: #1b3a5c; text-transform: uppercase; letter-spacing: .05em; }
+    .note {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin: 20px 0;
+    }
+    .note strong { color: #92400e; }
+    .print-btn {
+      display: inline-block;
+      margin-bottom: 32px;
+      padding: 10px 20px;
+      background: #1b3a5c;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: Georgia, serif;
+    }
+    .print-btn:hover { background: #24507e; }
+    footer {
+      margin-top: 48px;
+      padding-top: 16px;
+      border-top: 1px solid #eee;
+      font-size: 11px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print" style="text-align:right; margin-bottom: 16px;">
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+
+  <header>
+    <p>SAM TIME TRACKER</p>
+    <h1>Cross-Device Sync Setup</h1>
+  </header>
+
+  <p>
+    Your time tracker stores data in a private <strong>GitHub Gist</strong> — a free, secure snippet
+    of JSON tied to your GitHub account. From any device, you can push your latest data up or pull
+    the newest version down with a single button click in the app's Settings tab.
+  </p>
+
+  <div class="note">
+    <strong>Before you start:</strong> You need a free GitHub account. If you don't have one,
+    sign up at github.com. The sync uses only a single file in a private Gist — it is never
+    publicly visible.
+  </div>
+
+  <h2>Step 1 — Create a Personal Access Token</h2>
+  <div class="step-block">
+    <h3>Do this once, on any device</h3>
+    <ol>
+      <li>Sign in to <strong>github.com</strong>.</li>
+      <li>Click your profile picture (top-right) → <strong>Settings</strong>.</li>
+      <li>In the left sidebar, scroll to the bottom and click <strong>Developer settings</strong>.</li>
+      <li>Click <strong>Personal access tokens</strong> → <strong>Tokens (classic)</strong>.</li>
+      <li>Click <strong>Generate new token</strong> → <strong>Generate new token (classic)</strong>.</li>
+      <li>Give it a name like <code>sam-time-tracker</code> and set an expiry (or choose "No expiration").</li>
+      <li>Under <strong>Select scopes</strong>, check only <strong><code>gist</code></strong>.</li>
+      <li>Click <strong>Generate token</strong>.</li>
+      <li><strong>Copy the token immediately</strong> — it starts with <code>ghp_</code> and is only shown once.</li>
+    </ol>
+  </div>
+
+  <h2>Step 2 — Push from Your First Device</h2>
+  <div class="step-block">
+    <h3>First-time setup</h3>
+    <ol>
+      <li>Open <strong>SAM TIME TRACKER</strong> in your browser.</li>
+      <li>Click the <strong>Settings</strong> tab.</li>
+      <li>Scroll down to the <strong>Cross-Device Sync</strong> section.</li>
+      <li>Paste your token into the <strong>GitHub Personal Access Token</strong> field.</li>
+      <li>Leave the <strong>Gist ID</strong> field blank (it will be created automatically).</li>
+      <li>Click <strong>↑ Push to Gist</strong>.</li>
+      <li>After a moment, a Gist ID appears in the field — <strong>copy it</strong>. You'll need it on other devices.</li>
+    </ol>
+  </div>
+
+  <h2>Step 3 — Pull on Each Additional Device</h2>
+  <div class="step-block">
+    <h3>Repeat for every other device</h3>
+    <ol>
+      <li>Open <strong>SAM TIME TRACKER</strong> in the browser on the new device.</li>
+      <li>Go to <strong>Settings → Cross-Device Sync</strong>.</li>
+      <li>Paste the same <strong>GitHub Personal Access Token</strong>.</li>
+      <li>Paste the <strong>Gist ID</strong> you copied in Step 2.</li>
+      <li>Click <strong>↓ Pull from Gist</strong> and confirm.</li>
+      <li>All your data loads instantly. Done.</li>
+    </ol>
+  </div>
+
+  <h2>Day-to-Day Usage</h2>
+  <ul>
+    <li><strong>Switching devices:</strong> Push on your current device, then Pull on the next one.</li>
+    <li><strong>The token and Gist ID are saved</strong> in each browser after you enter them once — you won't need to re-enter them.</li>
+    <li><strong>Pull overwrites local data</strong> with the remote version, so always Push your latest changes before switching.</li>
+    <li>All data is synced: time tracker entries, to-do lists, saved quick-pick items, and settings.</li>
+  </ul>
+
+  <div class="note">
+    <strong>Security note:</strong> Your token is stored only in your browser's local storage and sent
+    exclusively to the GitHub API over HTTPS. It is never logged or transmitted anywhere else.
+    If you ever want to revoke access, delete the token from your GitHub Developer Settings.
+  </div>
+
+  <footer>
+    SAM TIME TRACKER &mdash; Sync setup guide &mdash; Generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+  </footer>
+
+  <script>
+    // Replace the static date placeholder
+    document.querySelector('footer').innerHTML =
+      'SAM TIME TRACKER — Sync setup guide — Generated ' +
+      new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  </script>
+
+</body>
+</html>

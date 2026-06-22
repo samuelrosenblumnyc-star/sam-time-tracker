@@ -627,12 +627,16 @@ function buildDefaultConfig() {
 
 function configSave() {
   localStorage.setItem('stt_config', JSON.stringify(config));
+  markLocalChange();
 }
+
+function markLocalChange() { localStorage.setItem('stt_lastChange', new Date().toISOString()); }
+function getLastLocalChange() { return localStorage.getItem('stt_lastChange') || ''; }
 
 // ── Storage: Tracker ─────────────────────────────────────────
 let db = {};
 function dbLoad() { try { db = JSON.parse(localStorage.getItem('stt_v1') || '{}'); } catch { db = {}; } }
-function dbSave() { localStorage.setItem('stt_v1', JSON.stringify(db)); }
+function dbSave() { localStorage.setItem('stt_v1', JSON.stringify(db)); markLocalChange(); }
 
 function getDay(date) {
   if (!db[date]) {
@@ -668,12 +672,12 @@ function todosLoad() {
     todosSave();
   }
 }
-function todosSave() { localStorage.setItem('stt_todos', JSON.stringify(todos)); }
+function todosSave() { localStorage.setItem('stt_todos', JSON.stringify(todos)); markLocalChange(); }
 
 // ── Storage: Custom saved "Other" tasks ──────────────────────
 let customTasks = {};
 function customLoad() { try { customTasks = JSON.parse(localStorage.getItem('stt_custom') || '{}'); } catch { customTasks = {}; } }
-function customSave() { localStorage.setItem('stt_custom', JSON.stringify(customTasks)); }
+function customSave() { localStorage.setItem('stt_custom', JSON.stringify(customTasks)); markLocalChange(); }
 function getCustomTasks(client) { const g = getTodoGroup(client); return customTasks[g] || []; }
 function addCustomTask(client, text) {
   const g = getTodoGroup(client);
@@ -1790,9 +1794,25 @@ function flashSync(msg, isErr) {
 async function autoSyncOnLoad() {
   if (!syncCfg.token || !syncCfg.gistId || !syncCfg.autoSync) return;
   try {
-    await gistPull();
-    renderAll();
-    flashSync('Synced');
+    const { token, gistId } = syncCfg;
+    const resp = await fetch(`https://api.github.com/gists/${gistId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!resp.ok) throw new Error('fetch failed');
+    const result = await resp.json();
+    const content = result.files?.[GIST_FILENAME]?.content;
+    if (!content) throw new Error('no file');
+    const remote = JSON.parse(content);
+    const localChange = getLastLocalChange();
+    if (remote.exportedAt && (!localChange || remote.exportedAt > localChange)) {
+      unpackAllData(content);
+      syncCfg.lastSync = new Date().toISOString();
+      syncCfgSave();
+      renderAll();
+      flashSync('Synced');
+    } else {
+      flashSync('Up to date');
+    }
   } catch {
     flashSync('Sync failed', true);
   }

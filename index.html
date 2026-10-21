@@ -13,14 +13,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, sans-serif; font-size: 13px; background: #f0f2f5; color: #222; }
+  :root { --top-h: calc(52px + env(safe-area-inset-top, 0px)); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 13px; background: #f0f2f5; color: #222; }
+  button, input, select, textarea { font-family: inherit; }
+  button:focus-visible, .todo-pill:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 
   /* ── Top bar ── */
   #topbar {
     position: sticky; top: 0; z-index: 200;
     background: #1b3a5c; color: #fff;
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 16px; height: 52px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px; height: var(--top-h);
   }
   #topbar h1 { font-size: 15px; letter-spacing: .04em; }
   .nav-btn {
@@ -41,10 +44,17 @@
     padding: 4px 9px; font-size: 12px; cursor: pointer;
   }
   #todayBtn:hover { background: rgba(255,255,255,.25); }
+  #todayBtn:not(.is-today) { background: #fbbf24; border-color: #fbbf24; color: #1b3a5c; font-weight: bold; }
+  #todayBtn.is-today { opacity: .45; cursor: default; }
+  #dayName { font-size: 12px; color: rgba(255,255,255,.7); white-space: nowrap; }
+  #totalWrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 120px; margin-left: auto; }
   #totalDisplay {
-    font-size: 17px; font-weight: bold; min-width: 130px; text-align: right; transition: color .2s;
+    font-size: 17px; font-weight: bold; text-align: right; transition: color .2s; white-space: nowrap;
   }
   #totalDisplay.done { color: #4ade80; }
+  #totalBar { width: 100%; height: 4px; background: rgba(255,255,255,.18); border-radius: 2px; overflow: hidden; }
+  #totalFill { height: 100%; width: 0; background: #60a5fa; border-radius: 2px; transition: width .3s ease; }
+  #totalFill.done { background: #4ade80; }
   #syncIndicator {
     font-size: 10px; color: rgba(255,255,255,.65); display: none;
     white-space: nowrap; flex-shrink: 0;
@@ -62,7 +72,7 @@
 
   /* ── App tab bar ── */
   #appTabBar {
-    position: sticky; top: 52px; z-index: 150; height: 40px;
+    position: sticky; top: var(--top-h); z-index: 150; height: 40px;
     display: flex; align-items: flex-end;
     background: #f0f2f5; border-bottom: 2px solid #1b3a5c;
     padding: 0 16px;
@@ -79,7 +89,7 @@
 
   /* ── Controls ── */
   #controls {
-    position: sticky; top: 92px; z-index: 100;
+    position: sticky; top: calc(var(--top-h) + 40px); z-index: 100;
     background: #fff; border-bottom: 1px solid #dde;
     padding: 6px 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   }
@@ -102,61 +112,97 @@
   }
   #rangeDisplay:hover { background: #e8eaf0; }
   #controls-sep { width: 1px; height: 20px; background: #dde; margin: 0 2px; }
+  #addClientForm:not([hidden]) { display: flex; gap: 6px; align-items: center; }
+  #addClientInp { border: 1px solid #2563eb; border-radius: 4px; padding: 4px 8px; font-size: 12px; width: 180px; }
+  #addClientInp:focus { outline: none; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
   #dayInfo { font-size: 11px; color: #999; margin-left: auto; }
+  .jump-link { background: none; border: none; color: #2563eb; font-size: 12px; cursor: pointer; padding: 4px 6px; border-radius: 4px; }
+  .jump-link:hover { background: #eff6ff; }
 
   /* ── Grid ── */
-  #tableWrap { overflow: auto; height: calc(100vh - 132px); }
-  table { border-collapse: collapse; width: 100%; min-width: 400px; }
+  #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 80px); background: #fff; }
+  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(120px + var(--cols, 8) * 64px); }
 
   thead th {
     position: sticky; top: 0; z-index: 50;
     background: #1b3a5c; color: #fff;
-    padding: 6px 4px; font-size: 11px; border: 1px solid #2a4e78;
-    text-align: center; white-space: nowrap;
+    padding: 6px 14px 6px 4px; font-size: 11px; line-height: 1.2; border-right: 1px solid #2a4e78;
+    text-align: center; vertical-align: bottom;
   }
-  thead th.time-hdr { text-align: left; padding-left: 8px; min-width: 60px; }
-  thead th.total-hdr { min-width: 60px; }
-  .rm-btn { cursor: pointer; opacity: .45; font-size: 10px; font-weight: normal; margin-left: 2px; }
-  .rm-btn:hover { opacity: 1; color: #fca5a5; }
+  thead th.time-hdr { width: 64px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
+  thead th.total-hdr { width: 56px; padding-right: 4px; }
+  .hdr-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .rm-btn {
+    position: absolute; top: 2px; right: 1px; background: none; border: none; color: #fff;
+    font-size: 10px; line-height: 1; padding: 2px 3px; border-radius: 3px; cursor: pointer; opacity: 0; transition: opacity .12s;
+  }
+  thead th:hover .rm-btn, .rm-btn:focus-visible { opacity: .6; }
+  .rm-btn:hover { opacity: 1 !important; color: #fca5a5; background: rgba(255,255,255,.12); }
+  @media (hover: none) { .rm-btn { opacity: .45; } }
 
   tbody tr.overnight { background: #f8f8f8; }
   tbody tr.working         { background: #fff; }
-  tbody tr.working:nth-child(even) { background: #f5f7fa; }
-  tbody tr.working:hover, tbody tr.working:nth-child(even):hover { background: #e8f0fe; }
-  tbody tr.overnight:nth-child(even) { background: #f0f0f0; }
+  tbody tr.working:hover { background: #f3f7fe; }
   tbody.dragging { cursor: cell; user-select: none; }
 
-  td { border: 1px solid #eee; padding: 2px 3px; text-align: center; font-size: 11px; }
+  td { border-right: 1px solid #eef0f3; border-bottom: 1px solid #eef0f3; padding: 0 3px; height: 22px; text-align: center; font-size: 11px; }
+  tbody tr.hour-start td { border-top: 1px solid #d5dbe3; }
   td.time-cell {
-    text-align: left; padding-left: 8px;
-    font-family: monospace; color: #555; min-width: 60px; white-space: nowrap;
+    position: sticky; left: 0; z-index: 30; background: inherit;
+    text-align: right; padding-right: 8px; color: #b4bcc8; white-space: nowrap; font-variant-numeric: tabular-nums;
   }
-  td.client-cell { cursor: pointer; min-width: 30px; width: 40px; user-select: none; }
+  tr.hour-start td.time-cell { color: #334155; font-weight: bold; }
+  tr.now-row td.time-cell { color: #dc2626; font-weight: bold; box-shadow: inset 3px 0 0 #dc2626; }
+  tr.now-row td { border-bottom-color: #fca5a5; }
+  td.client-cell { cursor: pointer; position: relative; user-select: none; }
   td.client-cell:hover:not(.sel) { background: #dbeafe; }
-  td.client-cell.sel { background: #2563eb; }
-  td.client-cell.sel.has-task { background: #1d4ed8; }
-  td.client-cell.sel.has-task::after { content: '·'; color: #93c5fd; font-size: 16px; line-height: 0; vertical-align: middle; }
-  td.client-cell.drag-preview { background: #93c5fd !important; }
-  td.total-cell { color: #444; min-width: 50px; }
+  td.client-cell.sel { background: #2563eb; border-bottom-color: #2563eb; border-right-color: #fff; }
+  td.client-cell.sel.no-task { background: #93b4f5; border-bottom-color: #93b4f5; }
+  tbody tr.hour-start td.client-cell.sel:not(.run-start) { border-top-color: #2563eb; }
+  tbody tr.hour-start td.client-cell.sel.no-task:not(.run-start) { border-top-color: #93b4f5; }
+  td.client-cell.sel.run-end { border-bottom: 2px solid #fff; }
+  td.client-cell.sel:hover { filter: brightness(1.08); }
+  /* Label sits in a block's first cell and wraps down over the rest of the block */
+  .cell-lbl {
+    position: absolute; z-index: 1; left: 5px; right: 4px; top: 4px;
+    max-height: calc(var(--run, 1) * 22px - 6px); overflow: hidden;
+    font-size: 10.5px; line-height: 13px; color: #fff; text-align: left; pointer-events: none; overflow-wrap: anywhere;
+  }
+  .cell-lbl.single { top: 0; line-height: 21px; white-space: nowrap; text-overflow: ellipsis; }
+  td.no-task .cell-lbl { color: #1e3a8a; font-style: italic; opacity: .75; }
+  td.total-cell { color: #b4bcc8; }
 
   tfoot td {
-    background: #eef2f7; font-weight: bold;
-    border-top: 2px solid #1b3a5c; padding: 5px 4px; font-size: 12px; text-align: center;
+    position: sticky; bottom: 0; z-index: 40;
+    background: #eef2f7; font-weight: bold; height: auto;
+    border-top: 2px solid #1b3a5c; padding: 6px 4px; font-size: 12px; text-align: center;
   }
-  tfoot td:first-child { text-align: left; padding-left: 8px; }
+  tfoot td:first-child { text-align: right; padding-right: 8px; left: 0; z-index: 45; }
+  tfoot td.zero { color: #c0c7d2; font-weight: normal; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 900;
+    transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+    display: flex; align-items: center; gap: 16px; max-width: calc(100vw - 24px);
+    background: #1f2937; color: #fff; font-size: 13px; padding: 10px 14px; border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #toast button { background: none; border: none; color: #93c5fd; font-weight: bold; font-size: 13px; cursor: pointer; padding: 2px 4px; }
 
   /* ── Task popover ── */
   #taskPopover {
     display: none; position: fixed; z-index: 500;
     background: #fff; border: 1px solid #d1d5db; border-radius: 8px;
     box-shadow: 0 6px 20px rgba(0,0,0,.15); min-width: 170px; max-width: 260px;
-    padding: 4px 0; overflow: hidden;
+    padding: 4px 0; max-height: calc(100vh - 16px); overflow-x: hidden; overflow-y: auto;
   }
   .pop-header { padding: 6px 12px 5px; font-size: 11px; font-weight: bold; color: #1b3a5c; border-bottom: 1px solid #f0f0f0; }
   .pop-opt {
     display: block; width: 100%; text-align: left;
     padding: 7px 12px; background: none; border: none;
-    cursor: pointer; font-size: 12px; color: #333; font-family: Arial, sans-serif;
+    cursor: pointer; font-size: 12px; color: #333; font-family: inherit;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .pop-opt:hover { background: #f0f6ff; color: #1d4ed8; }
@@ -184,7 +230,7 @@
   .regen-btn:hover { background: #eff6ff; }
   .desc-textarea {
     flex: 1; border: 1px solid #ddd; border-radius: 4px;
-    padding: 5px 8px; font-size: 12px; font-family: Arial, sans-serif;
+    padding: 5px 8px; font-size: 12px; font-family: inherit;
     resize: vertical; min-height: 32px; line-height: 1.4;
   }
   .desc-textarea.auto-mode { border-color: #bfdbfe; background: #f8fbff; }
@@ -192,6 +238,9 @@
   .char-count { font-size: 10px; color: #bbb; width: 44px; padding-top: 8px; text-align: right; flex-shrink: 0; }
   .char-count.over { color: #dc2626; font-weight: bold; }
   .desc-textarea.over-limit { border-color: #dc2626 !important; background: #fff5f5; }
+  .desc-more { background: none; border: none; color: #2563eb; font-size: 12px; cursor: pointer; padding: 4px 0; }
+  .desc-more:hover { text-decoration: underline; }
+  .desc-empty { font-size: 12px; color: #999; font-style: italic; margin-bottom: 6px; }
 
   /* ── Burn Rate ── */
   #burnSection { margin: 8px 0 0; background: #fff; padding: 14px 16px 18px; }
@@ -202,11 +251,13 @@
   .burn-card-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
   .burn-card-label span { font-weight: normal; color: #666; font-size: 11px; }
   .burn-card-label span.over { color: #dc2626; font-weight: bold; }
-  .burn-track { height: 9px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
+  .burn-track { position: relative; height: 9px; background: #e5e7eb; border-radius: 5px; overflow: hidden; }
+  .burn-pace { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: #1b3a5c; opacity: .55; }
   .burn-fill { height: 100%; border-radius: 5px; transition: width .4s ease; background: #3b82f6; }
   .burn-fill.done { background: #16a34a; }
   .burn-fill.warn { background: #f59e0b; }
   .burn-pct { font-size: 10px; color: #999; text-align: right; margin-top: 3px; }
+  .burn-pct.behind { color: #b45309; }
 
   /* ── Export bar ── */
   #exportBar { background: #fff; border-top: 1px solid #eee; padding: 10px 16px; display: flex; gap: 8px; margin-top: 8px; }
@@ -217,6 +268,8 @@
   .todo-pill { padding: 5px 14px; border-radius: 20px; font-size: 12px; cursor: pointer; border: 1px solid #ccc; background: #fff; white-space: nowrap; }
   .todo-pill.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
   .todo-pill:hover:not(.active) { background: #f0f0f0; }
+  .pill-count { display: inline-block; margin-left: 6px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: #e5e7eb; color: #555; font-size: 10px; font-weight: bold; line-height: 16px; text-align: center; }
+  .todo-pill.active .pill-count { background: rgba(255,255,255,.22); color: #fff; }
   #todoContent { background: #fff; border-radius: 6px; padding: 16px; }
   #todoContent h3 { font-size: 14px; color: #1b3a5c; margin-bottom: 4px; }
   .todo-subtitle { font-size: 11px; color: #999; margin-bottom: 12px; }
@@ -225,21 +278,21 @@
   .todo-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
   .todo-table tr.done-row td { opacity: .5; }
   .done-check { width: 15px; height: 15px; cursor: pointer; accent-color: #2563eb; }
-  .todo-task-inp { border: none; background: transparent; width: 100%; font-family: Arial, sans-serif; font-size: 13px; color: inherit; }
+  .todo-task-inp { border: none; background: transparent; width: 100%; font-family: inherit; font-size: 13px; color: inherit; }
   .todo-task-inp:focus { outline: 1px solid #bfdbfe; border-radius: 2px; }
   .done-row .todo-task-inp { text-decoration: line-through; }
-  .todo-due-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: Arial, sans-serif; color: inherit; }
+  .todo-due-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: inherit; color: inherit; }
   .todo-due-inp:focus { outline: none; border-color: #bfdbfe; }
   .todo-due-inp.overdue { color: #dc2626; font-weight: bold; }
   .todo-del-btn { background: none; border: none; cursor: pointer; color: #ccc; font-size: 14px; padding: 2px 6px; border-radius: 3px; }
   .todo-del-btn:hover { color: #cc3333; background: #fff0f0; }
-  .todo-notes-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: Arial, sans-serif; width: 100%; min-width: 120px; color: inherit; }
+  .todo-notes-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: inherit; width: 100%; min-width: 120px; color: inherit; }
   .todo-notes-inp:focus { outline: none; border-color: #bfdbfe; background: #f8fbff; }
   .done-row .todo-notes-inp { text-decoration: line-through; }
   .add-task-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
-  .add-task-inp { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 13px; font-family: Arial, sans-serif; }
+  .add-task-inp { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
   .add-task-inp:focus { outline: none; border-color: #2563eb; }
-  .add-date-inp { border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; font-size: 12px; font-family: Arial, sans-serif; }
+  .add-date-inp { border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; font-size: 12px; font-family: inherit; }
   .add-date-inp:focus { outline: none; border-color: #2563eb; }
   .add-task-btn { background: #1b3a5c; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   .add-task-btn:hover { background: #24507e; }
@@ -264,7 +317,7 @@
   .settings-client-name { flex: 1; font-size: 13px; }
   .settings-client-name-inp {
     flex: 1; border: 1px solid #bfdbfe; border-radius: 3px;
-    padding: 3px 7px; font-size: 13px; font-family: Arial, sans-serif;
+    padding: 3px 7px; font-size: 13px; font-family: inherit;
   }
   .settings-client-name-inp:focus { outline: none; border-color: #2563eb; }
   .s-icon-btn {
@@ -276,7 +329,7 @@
   .add-setting-row { display: flex; gap: 8px; margin-bottom: 10px; }
   .settings-text-inp {
     flex: 1; border: 1px solid #ddd; border-radius: 4px;
-    padding: 6px 10px; font-size: 13px; font-family: Arial, sans-serif;
+    padding: 6px 10px; font-size: 13px; font-family: inherit;
   }
   .settings-text-inp:focus { outline: none; border-color: #2563eb; }
   .settings-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -289,14 +342,14 @@
   .settings-br-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
   .settings-br-name {
     border: 1px solid #d1d5db; border-radius: 4px;
-    padding: 5px 9px; font-size: 13px; font-family: Arial, sans-serif;
+    padding: 5px 9px; font-size: 13px; font-family: inherit;
     font-weight: bold; color: #1b3a5c; flex: 1; max-width: 200px; min-width: 100px;
   }
   .settings-br-name:focus { outline: none; border-color: #2563eb; }
   .br-target-group { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #555; }
   .settings-br-target {
     width: 62px; border: 1px solid #d1d5db; border-radius: 4px;
-    padding: 5px 7px; font-size: 12px; font-family: Arial, sans-serif; text-align: right;
+    padding: 5px 7px; font-size: 12px; font-family: inherit; text-align: right;
   }
   .settings-br-target:focus { outline: none; border-color: #2563eb; }
   .settings-br-del { margin-left: auto; }
@@ -321,7 +374,11 @@
   .home-panel h2 { font-size: 13px; font-weight: bold; color: #1b3a5c; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
   .home-task-item { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f5f5f5; }
   .home-task-item:last-child { border-bottom: none; }
-  .home-task-group { font-size: 11px; color: #999; min-width: 68px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .home-count { font-size: 10px; font-weight: bold; color: #fff; background: #94a3b8; border-radius: 9px; padding: 0 6px; line-height: 16px; }
+  .home-count.overdue { background: #dc2626; }
+  .home-count.today { background: #d97706; }
+  .home-task-group { font-size: 11px; color: #999; min-width: 68px; max-width: 90px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .home-task-group:hover { color: #2563eb; text-decoration: underline; }
   .home-task-text { font-size: 12px; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .home-task-due { font-size: 11px; color: #888; white-space: nowrap; flex-shrink: 0; }
   .home-task-due.overdue { color: #dc2626; font-weight: bold; }
@@ -338,19 +395,19 @@
   .priority-high { background: #fee2e2; color: #dc2626; }
   .priority-med  { background: #fef3c7; color: #d97706; }
   .priority-low  { background: #dcfce7; color: #16a34a; }
-  .todo-priority-sel { font-size: 11px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 3px; font-family: Arial, sans-serif; cursor: pointer; max-width: 70px; }
+  .todo-priority-sel { font-size: 11px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 3px; font-family: inherit; cursor: pointer; max-width: 70px; }
   .todo-priority-sel:focus { outline: none; border-color: #bfdbfe; }
   .done-row .todo-priority-sel { opacity: .5; }
 
   /* ── Sort bar ── */
   .todo-sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #666; }
-  .todo-sort-btn { font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; border: 1px solid #ddd; background: #fff; font-family: Arial, sans-serif; }
+  .todo-sort-btn { font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; border: 1px solid #ddd; background: #fff; font-family: inherit; }
   .todo-sort-btn.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
   .todo-all-group-hdr { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: .04em; padding: 10px 8px 4px; }
 
   /* ── Sync Panel ── */
   .sync-field-lbl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #555; font-weight: bold; margin-bottom: 8px; }
-  .sync-field-lbl input { font-weight: normal; font-family: Arial, sans-serif; }
+  .sync-field-lbl input { font-weight: normal; font-family: inherit; }
   .sync-status { font-size: 11px; color: #888; margin: 10px 0 0; min-height: 14px; line-height: 1.4; }
   .sync-ok  { color: #16a34a; font-weight: bold; }
   .sync-err { color: #dc2626; font-weight: bold; }
@@ -358,33 +415,38 @@
 
   /* ── Mobile ─────────────────────────────────────────────────── */
   @media (max-width: 640px) {
-    /* Top bar: hide quote, tighten up */
-    #quoteDisplay { display: none; }
-    #topbar { gap: 5px; padding: 6px 8px; height: 52px; }
-    #topbar h1 { font-size: 11px; letter-spacing: 0; flex-shrink: 0; }
-    .nav-btn { padding: 4px 7px; font-size: 11px; }
-    #dateInput { padding: 3px 4px; font-size: 11px; max-width: 108px; min-width: 0; flex-shrink: 1; }
-    #todayBtn { padding: 3px 6px; font-size: 10px; flex-shrink: 0; }
-    #totalDisplay { font-size: 13px; min-width: 76px; }
+    /* Top bar: hide quote + title, keep date nav and the day total */
+    #quoteDisplay, #topbar h1, .nav-lbl, #dayName { display: none; }
+    #topbar { gap: 6px; padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px; }
+    .nav-btn { padding: 6px 10px; font-size: 14px; }
+    #dateInput { padding: 4px 4px; font-size: 12px; max-width: 120px; min-width: 0; flex-shrink: 1; }
+    #todayBtn { padding: 5px 7px; font-size: 11px; flex-shrink: 0; }
+    #totalWrap { min-width: 0; flex-shrink: 0; }
+    #totalDisplay { font-size: 14px; }
 
     /* Tab bar */
-    .app-tab-btn { padding: 5px 7px 7px; font-size: 11px; }
+    .app-tab-btn { padding: 5px 2px 7px; font-size: 11px; flex: 1; white-space: nowrap; }
+    #appTabBar { padding: 0 4px; }
 
     /* Controls */
-    #controls { padding: 5px 8px; gap: 5px; top: 92px; }
-    .ctrl-btn { font-size: 11px; padding: 4px 8px; }
-    #rangeDisplay { font-size: 11px; min-width: 90px; }
-    #dayInfo { display: none; }
+    #controls { padding: 5px 8px; gap: 5px; }
+    .ctrl-btn { font-size: 11px; padding: 5px 8px; }
+    .ctrl-lbl { display: none; }
+    #rangeDisplay { font-size: 11px; min-width: 0; }
+    #controls-sep, #dayInfo, .jump-link { display: none; }
+    #addClientForm:not([hidden]) { flex: 1 1 100%; }
+    #addClientInp { flex: 1; width: auto; font-size: 16px; }
 
     /* Time grid */
-    #tableWrap { height: calc(100vh - 134px); }
-    td { padding: 1px 1px; }
-    td.time-cell { font-size: 10px; min-width: 44px; padding-left: 4px; }
-    td.client-cell { min-width: 30px; width: 34px; min-height: 28px; }
+    #tableWrap table { min-width: calc(92px + var(--cols, 8) * 46px); }
+    td { padding: 0 1px; height: 30px; }
+    td.time-cell { font-size: 10px; padding-right: 5px; }
+    .cell-lbl { display: none; }
     thead th { padding: 5px 2px; font-size: 10px; }
-    thead th.time-hdr { padding-left: 4px; min-width: 44px; }
-    tfoot td { padding: 3px 2px; font-size: 10px; }
-    tfoot td:first-child { padding-left: 4px; }
+    thead th.time-hdr { width: 50px; padding: 5px 5px; }
+    thead th.total-hdr { width: 42px; }
+    tfoot td { padding: 4px 2px; font-size: 10px; }
+    tfoot td:first-child { padding-right: 5px; }
 
     /* Descriptions */
     #descSection { padding: 10px; }
@@ -446,19 +508,23 @@
 <!-- ── Top bar ── -->
 <div id="topbar">
   <h1>SAM TIME TRACKER</h1>
-  <button class="nav-btn" id="prevBtn">&#8592; Prev</button>
+  <button class="nav-btn" id="prevBtn" title="Previous day (←)" aria-label="Previous day">&#8592;<span class="nav-lbl"> Prev</span></button>
   <input type="date" id="dateInput">
-  <button class="nav-btn" id="nextBtn">Next &#8594;</button>
-  <button id="todayBtn">Today</button>
+  <button class="nav-btn" id="nextBtn" title="Next day (→)" aria-label="Next day"><span class="nav-lbl">Next </span>&#8594;</button>
+  <button id="todayBtn" title="Jump to today (T)">Today</button>
+  <span id="dayName"></span>
   <div id="quoteDisplay" title="Click for next quote"></div>
   <span id="syncIndicator"></span>
-  <div id="totalDisplay">0.00 / 8.0 hrs</div>
+  <div id="totalWrap" title="Hours logged on this day">
+    <div id="totalDisplay">0.00 / 8.0 hrs</div>
+    <div id="totalBar"><div id="totalFill"></div></div>
+  </div>
 </div>
 
 <!-- ── App tab bar ── -->
 <div id="appTabBar">
   <button class="app-tab-btn" data-tab="home">&#8962; Home</button>
-  <button class="app-tab-btn active" data-tab="tracker">&#9200; Time Tracker</button>
+  <button class="app-tab-btn active" data-tab="tracker">&#9719; Time Tracker</button>
   <button class="app-tab-btn" data-tab="todos">&#9745; To-Do Lists</button>
   <button class="app-tab-btn" data-tab="settings">&#9881; Settings</button>
 </div>
@@ -471,13 +537,20 @@
 <!-- ── Time Tracker Tab ── -->
 <div id="tab-tracker" class="tab-content active">
   <div id="controls">
-    <button class="ctrl-btn" id="earlierBtn">&#9650; Earlier</button>
+    <button class="ctrl-btn" id="earlierBtn" title="Show an earlier hour">&#9650;<span class="ctrl-lbl"> Earlier</span></button>
     <span id="rangeDisplay" title="Click to reset to 8 AM – 7 PM">8:00 AM – 7:00 PM</span>
-    <button class="ctrl-btn" id="laterBtn">Later &#9660;</button>
+    <button class="ctrl-btn" id="laterBtn" title="Show a later hour"><span class="ctrl-lbl">Later </span>&#9660;</button>
     <div id="controls-sep"></div>
     <button class="ctrl-btn primary" id="addClientBtn">+ Add Client</button>
+    <form id="addClientForm" hidden>
+      <input id="addClientInp" list="clientSuggest" placeholder="Client / project name…" autocomplete="off">
+      <datalist id="clientSuggest"></datalist>
+      <button class="ctrl-btn primary">Add</button>
+      <button type="button" class="ctrl-btn" id="addClientCancel">Cancel</button>
+    </form>
     <button class="ctrl-btn danger" id="clearBtn">Clear Day</button>
     <span id="dayInfo"></span>
+    <button class="jump-link" id="jumpSummaryBtn">Descriptions &amp; burn rate &#8595;</button>
   </div>
   <div id="tableWrap">
     <table>
@@ -547,6 +620,7 @@
 
 <!-- ── Task popover ── -->
 <div id="taskPopover"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 // ── Constants ────────────────────────────────────────────────
@@ -598,9 +672,27 @@ function fmtRange(mins) {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   const h12 = h % 12 || 12;
-  const ampm = h < 12 ? 'AM' : 'PM';
+  const ampm = h < 12 || h === 24 ? 'AM' : 'PM';
   return `${h12}${m ? ':' + pad(m) : ''} ${ampm}`;
 }
+function fmtDay(date) { return new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+function slotIdx(time) { const [h, m] = time.split(':').map(Number); return (h * 60 + m) / 15; }
+function nowSlotIdx() { const d = new Date(); return Math.floor((d.getHours() * 60 + d.getMinutes()) / 15); }
+
+// ── Toast (replaces alert(); optional Undo) ──────────────────
+const toastEl = document.getElementById('toast');
+function toast(msg, undo) {
+  toastEl.innerHTML = '';
+  toastEl.appendChild(Object.assign(document.createElement('span'), { textContent: msg }));
+  if (undo) {
+    const btn = document.createElement('button'); btn.textContent = 'Undo';
+    btn.onclick = () => { undo(); hideToast(); };
+    toastEl.appendChild(btn);
+  }
+  toastEl.classList.add('show');
+  clearTimeout(toastEl._t); toastEl._t = setTimeout(hideToast, undo ? 7000 : 3500);
+}
+function hideToast() { toastEl.classList.remove('show'); }
 
 // ── Config ───────────────────────────────────────────────────
 let config = { defaultClients: [], burnRates: [] };
@@ -713,9 +805,24 @@ let rangeStart = 8 * 60;
 let rangeEnd   = 19 * 60;
 let activeTodoGroup = null;
 let todoSortMode = 'date'; // 'date' | 'priority'
+let showAllDescs = false;
 
-function todayStr() { return new Date().toISOString().split('T')[0]; }
-function offsetDate(date, d) { const dt = new Date(date + 'T12:00:00'); dt.setDate(dt.getDate() + d); return dt.toISOString().split('T')[0]; }
+// Local calendar date (toISOString() is UTC, which rolls over to tomorrow in the evening)
+function dateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function todayStr() { return dateStr(new Date()); }
+function offsetDate(date, d) { const dt = new Date(date + 'T12:00:00'); dt.setDate(dt.getDate() + d); return dateStr(dt); }
+
+function rangeLoad() {
+  try { const r = JSON.parse(localStorage.getItem('stt_range') || 'null'); if (r) { rangeStart = r.start; rangeEnd = r.end; } } catch {}
+}
+function rangeSave() { localStorage.setItem('stt_range', JSON.stringify({ start: rangeStart, end: rangeEnd })); }
+
+// Visible hours: the chosen range, widened to include any time logged outside it
+function viewRange(day) {
+  let lo = rangeStart, hi = rangeEnd;
+  Object.keys(day.blocks).forEach(t => { const m = slotIdx(t) * 15; lo = Math.min(lo, m - m % 60); hi = Math.max(hi, m - m % 60 + 60); });
+  return { lo, hi };
+}
 
 function sortedTasks(tasks) {
   return [...tasks].sort((a, b) => {
@@ -729,10 +836,11 @@ function sortedTasks(tasks) {
   });
 }
 
-function updateRangeDisplay() {
-  document.getElementById('rangeDisplay').textContent = `${fmtRange(rangeStart)} – ${fmtRange(rangeEnd)}`;
-  document.getElementById('earlierBtn').disabled = rangeStart <= 0;
-  document.getElementById('laterBtn').disabled = rangeEnd >= 1440;
+function updateRangeDisplay(day) {
+  const { lo, hi } = viewRange(day);
+  document.getElementById('rangeDisplay').textContent = `${fmtRange(lo)} – ${fmtRange(hi)}`;
+  document.getElementById('earlierBtn').disabled = lo <= 0;
+  document.getElementById('laterBtn').disabled = hi >= 1440;
 }
 
 // ── Calculations ─────────────────────────────────────────────
@@ -748,26 +856,24 @@ function calcTaskHours(client, day) {
   return out;
 }
 
+// Human-readable task for a block ('' when no task is picked)
+function taskLabel(client, b) {
+  const taskId = bTaskId(b);
+  if (!taskId) return '';
+  if (taskId === '__meeting_int__') return 'Standing Meeting (Internal)';
+  if (taskId === '__meeting_cli__') return 'Standing Meeting (Client)';
+  if (taskId === '__other__') return bOtherText(b);
+  return findTask(client, taskId)?.task || '';
+}
+
 function generateDesc(client, day) {
   const tasks = {};
   SLOTS.forEach(s => {
     const b = day.blocks[s.time];
     if (!b || bClient(b) !== client) return;
     const taskId = bTaskId(b) || '__other__';
-    let key, label;
-    if (taskId === '__meeting_int__') {
-      key = '__meeting_int__'; label = 'Standing Meeting (Internal)';
-    } else if (taskId === '__meeting_cli__') {
-      key = '__meeting_cli__'; label = 'Standing Meeting (Client)';
-    } else if (taskId === '__other__') {
-      const ot = bOtherText(b);
-      key = '__other__:' + ot;
-      label = ot || 'other';
-    } else {
-      key = taskId;
-      const obj = findTask(client, taskId);
-      label = obj ? obj.task : 'other';
-    }
+    const key = taskId === '__other__' ? '__other__:' + bOtherText(b) : taskId;
+    const label = taskLabel(client, b) || 'other';
     if (!tasks[key]) tasks[key] = { label, hrs: 0 };
     tasks[key].hrs += 0.25;
   });
@@ -800,7 +906,9 @@ function calcMonthlyHours() {
 function renderAll() {
   const day = getDay(currentDate);
   document.getElementById('dateInput').value = currentDate;
-  updateRangeDisplay();
+  document.getElementById('dayName').textContent = new Date(currentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+  document.getElementById('todayBtn').classList.toggle('is-today', currentDate === todayStr());
+  updateRangeDisplay(day);
   renderHead(day);
   renderBody(day);
   renderFoot(day);
@@ -815,48 +923,82 @@ function renderHead(day) {
   const thTime = document.createElement('th'); thTime.className = 'time-hdr'; thTime.textContent = 'Time'; tr.appendChild(thTime);
   day.clients.forEach((c, i) => {
     const th = document.createElement('th'); th.title = c;
-    const short = c.length > 12 ? c.slice(0, 11) + '…' : c;
-    th.innerHTML = `${esc(short)}<span class="rm-btn" data-i="${i}" title="Remove ${esc(c)}"> ✕</span>`;
+    th.innerHTML = `<span class="hdr-name">${esc(c)}</span><button class="rm-btn" data-i="${i}" title="Remove ${esc(c)} from this day" aria-label="Remove ${esc(c)}">✕</button>`;
     tr.appendChild(th);
   });
-  const thTotal = document.createElement('th'); thTotal.className = 'total-hdr'; thTotal.textContent = 'Total (hrs)'; tr.appendChild(thTotal);
+  const thTotal = document.createElement('th'); thTotal.className = 'total-hdr'; thTotal.textContent = 'Total'; tr.appendChild(thTotal);
   const thead = document.getElementById('thead'); thead.innerHTML = ''; thead.appendChild(tr);
+  thead.parentElement.style.setProperty('--cols', day.clients.length);
 }
 
 function renderBody(day) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
-  const { clients, blocks } = day;
+  const { lo, hi } = viewRange(day);
 
   SLOTS.forEach(slot => {
-    if (slot.mins < rangeStart || slot.mins > rangeEnd) return;
-    const b = blocks[slot.time];
-    const selClient = bClient(b);
-    const hasTask = !!bTaskId(b);
-
+    if (slot.mins < lo || slot.mins >= hi) return;
+    const m = slot.mins % 60;
     const tr = document.createElement('tr');
-    tr.className = slot.mins < 450 ? 'overnight' : 'working';
+    tr.className = (slot.mins < 450 ? 'overnight' : 'working') + (m === 0 ? ' hour-start' : '');
     tr.dataset.time = slot.time;
 
-    const tdTime = document.createElement('td'); tdTime.className = 'time-cell'; tdTime.textContent = slot.label; tr.appendChild(tdTime);
+    const tdTime = document.createElement('td'); tdTime.className = 'time-cell'; tdTime.title = slot.label;
+    tdTime.textContent = m ? `:${pad(m)}` : fmtRange(slot.mins); tr.appendChild(tdTime);
 
-    clients.forEach((c, i) => {
-      const td = document.createElement('td');
-      let cls = 'client-cell';
-      if (selClient === c) { cls += ' sel'; if (hasTask) cls += ' has-task'; }
-      td.className = cls; td.dataset.time = slot.time; td.dataset.ci = i;
+    day.clients.forEach((c, i) => {
+      const td = document.createElement('td'); td.className = 'client-cell';
+      td.dataset.time = slot.time; td.dataset.ci = i;
       tr.appendChild(td);
     });
 
-    const tdTotal = document.createElement('td'); tdTotal.className = 'total-cell'; tdTotal.textContent = selClient ? '0.25' : ''; tr.appendChild(tdTotal);
+    const tdTotal = document.createElement('td'); tdTotal.className = 'total-cell'; tr.appendChild(tdTotal);
     tbody.appendChild(tr);
   });
+  decorateCells(day);
+  markNow();
+}
+
+// Consecutive slots with the same client + task render as one block, labelled at its top
+function runKey(b) { return b ? `${bClient(b)}|${bTaskId(b) || ''}|${bOtherText(b)}` : ''; }
+
+function decorateCells(day) {
+  const { clients, blocks } = day;
+  document.querySelectorAll('#tbody td.client-cell').forEach(cell => {
+    const si = slotIdx(cell.dataset.time), b = blocks[cell.dataset.time], c = clients[+cell.dataset.ci];
+    cell.className = 'client-cell'; cell.textContent = ''; cell.removeAttribute('title');
+    if (bClient(b) !== c) return;
+    const key = runKey(b), label = taskLabel(c, b);
+    const runStart = !cell.parentElement.previousElementSibling || runKey(blocks[SLOTS[si - 1]?.time]) !== key;
+    const runEnd = runKey(blocks[SLOTS[si + 1]?.time]) !== key;
+    cell.className = 'client-cell sel' + (label ? '' : ' no-task') + (runStart ? ' run-start' : '') + (runEnd ? ' run-end' : '');
+    cell.title = `${c} — ${label || 'no task yet (click to pick one)'}`;
+    if (runStart) {
+      let run = 1, row = cell.parentElement.nextElementSibling;
+      while (row && runKey(blocks[row.dataset.time]) === key) { run++; row = row.nextElementSibling; }
+      cell.innerHTML = `<span class="cell-lbl${run === 1 ? ' single' : ''}" style="--run:${run}">${esc(label || 'no task')}</span>`;
+    }
+  });
+  document.querySelectorAll('#tbody tr[data-time]').forEach(row => {
+    const tc = row.querySelector('.total-cell');
+    if (tc) tc.textContent = bClient(blocks[row.dataset.time]) ? '0.25' : '';
+  });
+}
+
+function markNow() {
+  const idx = currentDate === todayStr() ? nowSlotIdx() : -1;
+  document.querySelectorAll('#tbody tr[data-time]').forEach(r => r.classList.toggle('now-row', slotIdx(r.dataset.time) === idx));
+}
+
+function scrollToNow() {
+  const wrap = document.getElementById('tableWrap'), row = document.querySelector('#tbody tr.now-row');
+  if (row && row.offsetTop > wrap.clientHeight - 60) wrap.scrollTop = row.offsetTop - wrap.clientHeight / 2;
 }
 
 function renderFoot(day) {
   const totals = calcTotals(day);
-  let html = '<tr><td>SUMS</td>';
-  day.clients.forEach(c => { const t = totals.byClient[c] || 0; html += `<td>${t > 0 ? t.toFixed(2) : '-'}</td>`; });
+  let html = '<tr><td>Sums</td>';
+  day.clients.forEach(c => { const t = totals.byClient[c] || 0; html += t > 0 ? `<td>${t.toFixed(2)}</td>` : '<td class="zero">–</td>'; });
   html += `<td>${totals.grand.toFixed(2)}</td></tr>`;
   document.getElementById('tfoot').innerHTML = html;
 }
@@ -866,10 +1008,12 @@ function renderDescs(day) {
   const totals = calcTotals(day);
   const container = document.getElementById('descRows');
   container.innerHTML = '';
+  let hidden = 0;
   day.clients.forEach((c, i) => {
     const hrs = totals.byClient[c] || 0;
     const isManual = !!day.descManual[c];
     const desc = day.descriptions[c] || '';
+    if (!showAllDescs && !hrs && !desc) { hidden++; return; }
     const row = document.createElement('div'); row.className = 'desc-row';
     const label = document.createElement('div'); label.className = 'desc-label';
     label.innerHTML = `${esc(c)}<small>${hrs > 0 ? hrs.toFixed(2) + ' hrs' : '–'}</small>`;
@@ -884,6 +1028,15 @@ function renderDescs(day) {
     row.appendChild(label); row.appendChild(ta); row.appendChild(countEl);
     container.appendChild(row);
   });
+  if (!container.children.length) {
+    container.appendChild(Object.assign(document.createElement('p'), { className: 'desc-empty', textContent: 'Log time above and descriptions fill in automatically from the tasks you pick.' }));
+  }
+  if (hidden || showAllDescs) {
+    const more = document.createElement('button'); more.className = 'desc-more';
+    more.textContent = hidden ? `+ Show ${hidden} more client${hidden !== 1 ? 's' : ''} (no time logged)` : 'Hide clients with no time';
+    more.onclick = () => { showAllDescs = !showAllDescs; renderDescs(getDay(currentDate)); };
+    container.appendChild(more);
+  }
 }
 
 function renderBurnRate() {
@@ -901,13 +1054,17 @@ function renderBurnRate() {
     const fillPct = Math.min(100, (hours / target) * 100);
     const isOver = hours > target;
     const isWarn = !isOver && (hours / target) - monthPct < -0.15;
+    const paceDiff = Math.round((hours - target * monthPct) * 4) / 4;
+    const paceTxt = isOver ? 'over target' : Math.abs(paceDiff) < 1 ? 'on pace' : `${fmtHrs(Math.abs(paceDiff))}h ${paceDiff > 0 ? 'ahead of' : 'behind'} pace`;
     const card = document.createElement('div'); card.className = 'burn-card';
     const lbl = document.createElement('div'); lbl.className = 'burn-card-label';
     lbl.innerHTML = `<strong>${esc(label)}</strong><span class="${isOver ? 'over' : ''}">${fmtHrs(hours)} / ${target} hrs</span>`;
     const track = document.createElement('div'); track.className = 'burn-track';
     const fill = document.createElement('div'); fill.className = 'burn-fill' + (fillPct >= 100 ? ' done' : isWarn ? ' warn' : ''); fill.style.width = `${fillPct}%`;
-    track.appendChild(fill);
-    const pctEl = document.createElement('div'); pctEl.className = 'burn-pct'; pctEl.textContent = `${Math.round(fillPct)}% of ${target}h target`;
+    const pace = document.createElement('div'); pace.className = 'burn-pace'; pace.style.left = `${monthPct * 100}%`;
+    pace.title = `Even pace for this date: ${fmtHrs(Math.round(target * monthPct * 4) / 4)}h`;
+    track.appendChild(fill); track.appendChild(pace);
+    const pctEl = document.createElement('div'); pctEl.className = 'burn-pct' + (isWarn ? ' behind' : ''); pctEl.textContent = `${Math.round(fillPct)}% · ${paceTxt}`;
     card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl); grid.appendChild(card);
   });
   section.appendChild(grid);
@@ -915,16 +1072,7 @@ function renderBurnRate() {
 
 // ── Targeted updates ─────────────────────────────────────────
 function refreshCells(day) {
-  const { clients, blocks } = day;
-  document.querySelectorAll('#tbody td.client-cell').forEach(cell => {
-    const b = blocks[cell.dataset.time]; const c = clients[+cell.dataset.ci];
-    const isSel = bClient(b) === c; const hasTask = isSel && !!bTaskId(b);
-    cell.className = 'client-cell' + (isSel ? ' sel' : '') + (hasTask ? ' has-task' : '');
-  });
-  document.querySelectorAll('#tbody tr[data-time]').forEach(row => {
-    const b = blocks[row.dataset.time]; const tc = row.querySelector('.total-cell');
-    if (tc) tc.textContent = bClient(b) ? '0.25' : '';
-  });
+  decorateCells(day);
   renderFoot(day);
 }
 
@@ -932,6 +1080,8 @@ function updateTotalDisplay(day) {
   const { grand } = calcTotals(day);
   const el = document.getElementById('totalDisplay');
   el.textContent = `${grand.toFixed(2)} / 8.0 hrs`; el.className = grand >= 8 ? 'done' : '';
+  const fill = document.getElementById('totalFill');
+  fill.style.width = `${Math.min(100, grand / 8 * 100)}%`; fill.classList.toggle('done', grand >= 8);
 }
 
 function updateDayInfo() {
@@ -1015,7 +1165,7 @@ function showPopover(anchorEl, time, client, day) {
     const inp = document.createElement('input');
     inp.type = 'text'; inp.value = isUnsavedOther ? currentOtherText : '';
     inp.placeholder = 'e.g. team lunch, prep call…';
-    inp.style.cssText = 'border:1px solid #d1d5db; border-radius:4px; padding:5px 8px; font-size:12px; font-family:Arial,sans-serif; width:100%;';
+    inp.style.cssText = 'border:1px solid #d1d5db; border-radius:4px; padding:5px 8px; font-size:12px; font-family:inherit; width:100%;';
     const row = document.createElement('div'); row.style.cssText = 'display:flex; gap:6px;';
     const okBtn = document.createElement('button');
     okBtn.textContent = 'OK';
@@ -1045,19 +1195,22 @@ function showPopover(anchorEl, time, client, day) {
   clearBtn.onclick = () => { delete day.blocks[time]; afterBlockChange(day); hidePopover(); };
   popoverEl.appendChild(clearBtn);
 
+  popoverEl.style.display = 'block';
   if (window.innerWidth <= 640) {
     popoverEl.classList.add('mobile-sheet');
     popoverEl.style.left = ''; popoverEl.style.top = '';
   } else {
     popoverEl.classList.remove('mobile-sheet');
     const rect = anchorEl.getBoundingClientRect();
-    const pw = 230;
+    const pw = popoverEl.offsetWidth, ph = popoverEl.offsetHeight;
     let left = rect.left;
     if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    // Open upward when there isn't room below the cell
+    let top = rect.bottom + 4;
+    if (top + ph > window.innerHeight - 8) top = Math.max(8, rect.top - ph - 4);
     popoverEl.style.left = `${Math.max(4, left)}px`;
-    popoverEl.style.top = `${rect.bottom + 4}px`;
+    popoverEl.style.top = `${top}px`;
   }
-  popoverEl.style.display = 'block';
 
   setTimeout(() => {
     popoverOutsideHandler = e => { if (!popoverEl.contains(e.target)) hidePopover(); };
@@ -1076,46 +1229,32 @@ let drag = null;
 let dragStartXY = null;
 const tbody = document.getElementById('tbody');
 
-tbody.addEventListener('mousedown', e => {
-  const cell = e.target.closest('.client-cell');
-  if (!cell || e.button !== 0) return;
-  e.preventDefault();
-  dragStartXY = { x: e.clientX, y: e.clientY };
+function startDrag(cell, x, y) {
+  dragStartXY = { x, y };
   drag = { ci: +cell.dataset.ci, startTime: cell.dataset.time, startCell: cell, moved: false };
-});
+}
 
-document.addEventListener('mousemove', e => {
-  if (!drag || drag.moved) return;
-  if (Math.abs(e.clientX - dragStartXY.x) + Math.abs(e.clientY - dragStartXY.y) > 5) {
-    drag.moved = true;
-    const day = getDay(currentDate);
-    drag.client = day.clients[drag.ci];
-    const _sb = day.blocks[drag.startTime];
-    const _sbMatch = bClient(_sb) === drag.client;
-    drag.taskId = _sbMatch ? bTaskId(_sb) : null;
-    drag.otherText = _sbMatch ? bOtherText(_sb) : '';
-    tbody.classList.add('dragging');
-    hidePopover();
-    paintCell(drag.startCell, drag.startTime, day);
-    renderFoot(day); updateTotalDisplay(day);
-  }
-});
-
-tbody.addEventListener('mouseover', e => {
-  if (!drag || !drag.moved) return;
-  const cell = e.target.closest('.client-cell');
-  if (!cell || +cell.dataset.ci !== drag.ci) return;
+// Once the pointer passes the threshold, start painting with the start cell's task (if it's this client)
+function beginDragIfMoved(x, y, threshold) {
+  if (drag.moved || Math.abs(x - dragStartXY.x) + Math.abs(y - dragStartXY.y) <= threshold) return;
+  drag.moved = true;
   const day = getDay(currentDate);
-  paintCell(cell, cell.dataset.time, day);
+  drag.client = day.clients[drag.ci];
+  const sb = day.blocks[drag.startTime];
+  const sbMatch = bClient(sb) === drag.client;
+  drag.taskId = sbMatch ? bTaskId(sb) : null;
+  drag.otherText = sbMatch ? bOtherText(sb) : '';
+  tbody.classList.add('dragging');
+  hidePopover();
+  paintCell(drag.startCell, drag.startTime, day);
   renderFoot(day); updateTotalDisplay(day);
-});
+}
 
-document.addEventListener('mouseup', e => {
+function endDrag() {
   if (!drag) return;
   const d = drag; drag = null; dragStartXY = null;
   tbody.classList.remove('dragging');
   const day = getDay(currentDate);
-
   if (!d.moved) {
     const client = day.clients[d.ci];
     const existingClient = bClient(day.blocks[d.startTime]);
@@ -1127,37 +1266,42 @@ document.addEventListener('mouseup', e => {
     showPopover(d.startCell, d.startTime, client, day);
   } else {
     autoFillDescs(day); dbSave();
-    renderDescs(day); renderBurnRate();
+    refreshCells(day); renderDescs(day); renderBurnRate();
   }
+}
+
+tbody.addEventListener('mousedown', e => {
+  const cell = e.target.closest('.client-cell');
+  if (!cell || e.button !== 0) return;
+  e.preventDefault();
+  startDrag(cell, e.clientX, e.clientY);
 });
+
+document.addEventListener('mousemove', e => { if (drag) beginDragIfMoved(e.clientX, e.clientY, 5); });
+
+tbody.addEventListener('mouseover', e => {
+  if (!drag || !drag.moved) return;
+  const cell = e.target.closest('.client-cell');
+  if (!cell || +cell.dataset.ci !== drag.ci) return;
+  const day = getDay(currentDate);
+  paintCell(cell, cell.dataset.time, day);
+  renderFoot(day); updateTotalDisplay(day);
+});
+
+document.addEventListener('mouseup', endDrag);
 
 // Touch drag-to-fill (mirrors mouse logic above)
 tbody.addEventListener('touchstart', e => {
   const cell = e.target.closest('.client-cell');
   if (!cell) return;
   e.preventDefault();
-  dragStartXY = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-  drag = { ci: +cell.dataset.ci, startTime: cell.dataset.time, startCell: cell, moved: false };
+  startDrag(cell, e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: false });
 
 document.addEventListener('touchmove', e => {
   if (!drag) return;
   const touch = e.touches[0];
-  if (!drag.moved) {
-    if (Math.abs(touch.clientX - dragStartXY.x) + Math.abs(touch.clientY - dragStartXY.y) > 8) {
-      drag.moved = true;
-      const day = getDay(currentDate);
-      drag.client = day.clients[drag.ci];
-      const _sb = day.blocks[drag.startTime];
-      const sbMatch = bClient(_sb) === drag.client;
-      drag.taskId = sbMatch ? bTaskId(_sb) : null;
-      drag.otherText = sbMatch ? bOtherText(_sb) : '';
-      tbody.classList.add('dragging');
-      hidePopover();
-      paintCell(drag.startCell, drag.startTime, day);
-      renderFoot(day); updateTotalDisplay(day);
-    }
-  }
+  beginDragIfMoved(touch.clientX, touch.clientY, 8);
   if (drag.moved) {
     e.preventDefault();
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -1170,68 +1314,71 @@ document.addEventListener('touchmove', e => {
   }
 }, { passive: false });
 
-document.addEventListener('touchend', () => {
-  if (!drag) return;
-  const d = drag; drag = null; dragStartXY = null;
-  tbody.classList.remove('dragging');
-  const day = getDay(currentDate);
-  if (!d.moved) {
-    const client = day.clients[d.ci];
-    const existingClient = bClient(day.blocks[d.startTime]);
-    if (existingClient !== client) {
-      setBlock(day, d.startTime, client, null);
-      autoFillDescs(day); dbSave();
-      refreshCells(day); updateTotalDisplay(day); renderDescs(day); renderBurnRate();
-    }
-    showPopover(d.startCell, d.startTime, client, day);
-  } else {
-    autoFillDescs(day); dbSave();
-    renderDescs(day); renderBurnRate();
-  }
-});
+document.addEventListener('touchend', endDrag);
 
 function paintCell(cell, time, day) {
   setBlock(day, time, drag.client, drag.taskId, drag.otherText || '');
-  cell.className = 'client-cell sel' + (drag.taskId ? ' has-task' : '');
+  cell.className = 'client-cell sel' + (drag.taskId ? '' : ' no-task');
   const tc = cell.closest('tr')?.querySelector('.total-cell');
   if (tc) tc.textContent = '0.25';
 }
 
 // ── Actions ──────────────────────────────────────────────────
+// Restores a day from a JSON snapshot (used by Undo)
+function restoreDay(date, snap) { db[date] = JSON.parse(snap); dbSave(); refreshVisible(); }
+
 function removeClient(idx) {
-  const day = getDay(currentDate); const name = day.clients[idx];
-  if (!confirm(`Remove "${name}" from ${currentDate}?`)) return;
+  const date = currentDate, day = getDay(date), name = day.clients[idx], snap = JSON.stringify(day);
   day.clients.splice(idx, 1);
   SLOTS.forEach(s => { if (bClient(day.blocks[s.time]) === name) delete day.blocks[s.time]; });
   delete day.descriptions[name]; delete day.descManual[name];
   dbSave(); renderAll();
   if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
+  toast(`Removed ${name} from ${fmtDay(date)}.`, () => restoreDay(date, snap));
 }
 
-function addClient() {
-  const name = (prompt('Client / project name:') || '').trim(); if (!name) return;
+const addClientBtn = document.getElementById('addClientBtn');
+const addClientForm = document.getElementById('addClientForm');
+const addClientInp = document.getElementById('addClientInp');
+
+function openAddClient() {
   const day = getDay(currentDate);
-  if (day.clients.includes(name)) { alert(`"${name}" already exists.`); return; }
-  day.clients.push(name); dbSave(); renderAll();
+  const known = new Set([...config.defaultClients, ...Object.values(db).flatMap(d => d.clients || [])]);
+  document.getElementById('clientSuggest').innerHTML = [...known].filter(c => !day.clients.includes(c)).map(c => `<option value="${esc(c)}">`).join('');
+  addClientBtn.hidden = true; addClientForm.hidden = false;
+  addClientInp.value = ''; addClientInp.focus();
+}
+function closeAddClient() { addClientForm.hidden = true; addClientBtn.hidden = false; }
+
+function addClient(name) {
+  const day = getDay(currentDate);
+  if (day.clients.includes(name)) { toast(`${name} is already on this day.`); addClientInp.select(); return; }
+  day.clients.push(name); dbSave(); renderAll(); closeAddClient();
   if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
+  toast(`Added ${name}.`);
 }
 
 function clearDay() {
-  if (!confirm(`Clear all time entries for ${currentDate}?`)) return;
-  const day = getDay(currentDate); day.blocks = {}; day.descManual = {};
+  const date = currentDate, day = getDay(date);
+  if (!Object.keys(day.blocks).length) { toast('Nothing logged on this day.'); return; }
+  const snap = JSON.stringify(day);
+  day.blocks = {}; day.descManual = {};
   dbSave(); renderAll();
+  toast(`Cleared ${fmtDay(date)}.`, () => restoreDay(date, snap));
 }
+
+function csvCell(v) { const s = String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
 
 function exportCSV() {
   const day = getDay(currentDate); const totals = calcTotals(day);
   const header = ['Time', ...day.clients, 'Task', 'Total (hrs)'];
   const rows = SLOTS.map(s => {
-    const b = day.blocks[s.time]; const selC = bClient(b); const selT = bTaskId(b);
-    const taskName = !selT ? '' : selT === '__other__' ? 'Other' : (findTask(selC, selT)?.task || '');
+    const b = day.blocks[s.time]; const selC = bClient(b);
+    const taskName = selC ? taskLabel(selC, b) : '';
     return [s.label, ...day.clients.map(c => selC === c ? 1 : 0), taskName, selC ? 0.25 : 0];
   });
   const sumsRow = ['SUMS', ...day.clients.map(c => (totals.byClient[c]||0).toFixed(2)), '', totals.grand.toFixed(2)];
-  const csv = [header, ...rows, sumsRow].map(r => r.join(',')).join('\n');
+  const csv = [header, ...rows, sumsRow].map(r => r.map(csvCell).join(',')).join('\n');
   const a = document.createElement('a');
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
   a.download = `time-tracker-${currentDate}.csv`; a.click();
@@ -1253,15 +1400,17 @@ function renderTodosTab() {
     activeTodoGroup = groups[0] || null;
   }
   const pillsEl = document.getElementById('todoClientPills'); pillsEl.innerHTML = '';
+  const openCount = g => clientTodos(g).filter(t => !t.done).length;
+  const pillHtml = (label, n) => esc(label) + (n ? `<span class="pill-count">${n}</span>` : '');
   const allBtn = document.createElement('button');
   allBtn.className = 'todo-pill' + (activeTodoGroup === '__all__' ? ' active' : '');
-  allBtn.textContent = 'All Clients';
+  allBtn.innerHTML = pillHtml('All Clients', groups.reduce((n, g) => n + openCount(g), 0));
   allBtn.onclick = () => { activeTodoGroup = '__all__'; renderTodosTab(); };
   pillsEl.appendChild(allBtn);
   groups.forEach(g => {
     const btn = document.createElement('button');
     btn.className = 'todo-pill' + (g === activeTodoGroup ? ' active' : '');
-    btn.textContent = g; btn.onclick = () => { activeTodoGroup = g; renderTodosTab(); };
+    btn.innerHTML = pillHtml(g, openCount(g)); btn.onclick = () => { activeTodoGroup = g; renderTodosTab(); };
     pillsEl.appendChild(btn);
   });
   if (activeTodoGroup) renderTodoList(activeTodoGroup);
@@ -1320,7 +1469,7 @@ function renderTodoList(group) {
 
       const tdCb = document.createElement('td'); const cb = document.createElement('input');
       cb.type = 'checkbox'; cb.className = 'done-check'; cb.checked = task.done;
-      cb.onchange = () => { toggleDone(g, task.id); renderTodoList(group); renderBody(getDay(currentDate)); };
+      cb.onchange = () => { toggleDone(g, task.id); renderTodosTab(); renderBody(getDay(currentDate)); };
       tdCb.appendChild(cb); tr.appendChild(tdCb);
 
       if (isAll) {
@@ -1367,11 +1516,14 @@ function renderTodoList(group) {
       tdNotes.appendChild(notesInp); tr.appendChild(tdNotes);
 
       const tdDel = document.createElement('td'); const del = document.createElement('button');
-      del.className = 'todo-del-btn'; del.textContent = '✕';
+      del.className = 'todo-del-btn'; del.textContent = '✕'; del.title = 'Delete task';
       del.onclick = () => {
-        if (!confirm(`Delete "${task.task}"?`)) return;
-        deleteTask(g, task.id); renderTodoList(group);
+        const snapTodos = JSON.stringify(todos), snapDb = JSON.stringify(db);
+        deleteTask(g, task.id); renderTodosTab();
         const day = getDay(currentDate); renderBody(day); renderDescs(day);
+        toast(`Deleted “${task.task}”.`, () => {
+          todos = JSON.parse(snapTodos); db = JSON.parse(snapDb); todosSave(); dbSave(); refreshVisible();
+        });
       };
       tdDel.appendChild(del); tr.appendChild(tdDel);
       tBody.appendChild(tr);
@@ -1387,8 +1539,9 @@ function renderTodoList(group) {
     const addBtn = document.createElement('button'); addBtn.className = 'add-task-btn'; addBtn.textContent = '+ Add';
     addBtn.onclick = () => {
       const text = taskInp.value.trim(); if (!text) { taskInp.focus(); return; }
-      addTask(group, text, dateInp.value, timeInp.value); taskInp.value = ''; dateInp.value = ''; timeInp.value = '';
-      renderTodoList(group); renderBody(getDay(currentDate));
+      addTask(group, text, dateInp.value, timeInp.value);
+      renderTodosTab(); renderBody(getDay(currentDate));
+      document.querySelector('#todoContent .add-task-inp')?.focus();
     };
     taskInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
     addRow.appendChild(taskInp); addRow.appendChild(dateInp); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
@@ -1400,8 +1553,7 @@ function renderTodoList(group) {
 function renderHomeTab() {
   const section = document.getElementById('homeSection'); section.innerHTML = '';
   const today = todayStr();
-  const cutoff = new Date(today + 'T12:00:00'); cutoff.setDate(cutoff.getDate() + 7);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const cutoffStr = offsetDate(today, 7);
 
   const overdue = [], dueToday = [], highPri = [], upcoming = [];
   allTodoGroups().forEach(g => {
@@ -1428,10 +1580,11 @@ function renderHomeTab() {
   const day = getDay(currentDate);
   const totals = calcTotals(day);
   const sumPanel = document.createElement('div'); sumPanel.className = 'home-panel home-time-log';
-  const sh = document.createElement('h2'); sh.textContent = `Time Log — ${currentDate}`; sumPanel.appendChild(sh);
+  const isToday = currentDate === today;
+  const sh = document.createElement('h2'); sh.textContent = `Time Log — ${isToday ? 'Today' : fmtDay(currentDate)}`; sumPanel.appendChild(sh);
   const hasTotals = Object.values(totals.byClient).some(v => v > 0);
   if (!hasTotals) {
-    const p = document.createElement('p'); p.className = 'home-empty'; p.textContent = 'No time logged today.'; sumPanel.appendChild(p);
+    const p = document.createElement('p'); p.className = 'home-empty'; p.textContent = isToday ? 'No time logged today.' : 'No time logged on this day.'; sumPanel.appendChild(p);
   } else {
     day.clients.filter(c => totals.byClient[c] > 0).forEach(c => {
       const row = document.createElement('div'); row.className = 'home-time-row';
@@ -1447,6 +1600,7 @@ function renderHomeTab() {
 function makeHomePanel(title, tasks, type, today) {
   const panel = document.createElement('div'); panel.className = 'home-panel';
   const h2 = document.createElement('h2'); h2.textContent = title; panel.appendChild(h2);
+  if (tasks.length) h2.appendChild(Object.assign(document.createElement('span'), { className: `home-count ${type}`, textContent: tasks.length }));
   if (!tasks.length) {
     const p = document.createElement('p'); p.className = 'home-empty';
     p.textContent = type === 'overdue' ? 'All clear!' : 'Nothing here.'; panel.appendChild(p);
@@ -1455,7 +1609,8 @@ function makeHomePanel(title, tasks, type, today) {
       const row = document.createElement('div'); row.className = 'home-task-item';
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'home-done-cb';
       cb.onchange = () => { toggleDone(t.group, t.id); renderHomeTab(); };
-      const grp = document.createElement('span'); grp.className = 'home-task-group'; grp.textContent = t.group;
+      const grp = document.createElement('span'); grp.className = 'home-task-group'; grp.textContent = t.group; grp.title = `Open ${t.group} list`;
+      grp.onclick = () => { activeTodoGroup = t.group; showTab('todos'); };
       const txt = document.createElement('span'); txt.className = 'home-task-text'; txt.textContent = t.task;
       row.appendChild(cb); row.appendChild(grp); row.appendChild(txt);
       const pri = t.priority || 0;
@@ -1573,7 +1728,7 @@ function startEditClient(idx, item, nameSpan) {
     if (editBtn) editBtn.style.display = '';
     if (!newName || newName === oldName) { renderSettingsClients(); return; }
     if (config.defaultClients.some((c, j) => c === newName && j !== idx)) {
-      alert(`"${newName}" already exists.`);
+      toast(`"${newName}" already exists.`);
       inp.focus(); return;
     }
     const renameAll = confirm(`Rename "${oldName}" to "${newName}" across all tracked days too?`);
@@ -1808,7 +1963,7 @@ async function autoSyncOnLoad() {
       unpackAllData(content);
       syncCfg.lastSync = new Date().toISOString();
       syncCfgSave();
-      renderAll();
+      refreshVisible();
       flashSync('Synced');
     } else {
       flashSync('Up to date');
@@ -1895,10 +2050,7 @@ function renderSyncPanel() {
       await gistPull();
       statusEl.textContent = `Pulled successfully  |  ${new Date(syncCfg.lastSync).toLocaleString()}`;
       statusEl.className = 'sync-status sync-ok';
-      renderAll();
-      if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
-      if (document.getElementById('tab-home').classList.contains('active')) renderHomeTab();
-      renderSyncPanel();
+      refreshVisible();
     } catch (e) {
       statusEl.textContent = `Pull failed: ${e.message}`;
       statusEl.className = 'sync-status sync-err';
@@ -1949,44 +2101,89 @@ document.getElementById('descRows').addEventListener('click', e => {
   }
 });
 
-document.getElementById('appTabBar').addEventListener('click', e => {
-  const btn = e.target.closest('.app-tab-btn'); if (!btn) return;
-  const tab = btn.dataset.tab; hidePopover();
+const TABS = ['home', 'tracker', 'todos', 'settings'];
+function activeTab() { return document.querySelector('.app-tab-btn.active')?.dataset.tab; }
+
+function showTab(tab) {
+  hidePopover();
   document.querySelectorAll('.app-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === `tab-${tab}`));
   if (tab === 'home') renderHomeTab();
   if (tab === 'todos') renderTodosTab();
   if (tab === 'settings') renderSettings();
+  localStorage.setItem('stt_tab', tab);
+}
+
+// Re-render the tracker plus whichever other tab is showing
+function refreshVisible() {
+  renderAll();
+  const tab = activeTab();
+  if (tab === 'home') renderHomeTab();
+  if (tab === 'todos') renderTodosTab();
+  if (tab === 'settings') renderSettings();
+}
+
+document.getElementById('appTabBar').addEventListener('click', e => {
+  const btn = e.target.closest('.app-tab-btn'); if (btn) showTab(btn.dataset.tab);
 });
 
-// Range expand/collapse
+// Range expand/collapse (starts from what's visible, which may already be widened by logged time)
 document.getElementById('earlierBtn').addEventListener('click', () => {
-  rangeStart = Math.max(0, rangeStart - 60); updateRangeDisplay(); renderBody(getDay(currentDate));
+  const day = getDay(currentDate);
+  rangeStart = Math.max(0, viewRange(day).lo - 60); rangeSave(); updateRangeDisplay(day); renderBody(day);
 });
 document.getElementById('laterBtn').addEventListener('click', () => {
-  rangeEnd = Math.min(1440, rangeEnd + 60); updateRangeDisplay(); renderBody(getDay(currentDate));
+  const day = getDay(currentDate);
+  rangeEnd = Math.min(1440, viewRange(day).hi + 60); rangeSave(); updateRangeDisplay(day); renderBody(day);
 });
 document.getElementById('rangeDisplay').addEventListener('click', () => {
-  rangeStart = 8 * 60; rangeEnd = 19 * 60; updateRangeDisplay(); renderBody(getDay(currentDate));
+  const day = getDay(currentDate);
+  rangeStart = 8 * 60; rangeEnd = 19 * 60; rangeSave(); updateRangeDisplay(day); renderBody(day);
 });
 
 // Navigation
-function navTo(date) { hidePopover(); currentDate = date; renderAll(); }
+function navTo(date) {
+  if (!date) return;
+  hidePopover(); currentDate = date; renderAll();
+  if (activeTab() === 'home') renderHomeTab();
+}
 document.getElementById('prevBtn').onclick = () => navTo(offsetDate(currentDate, -1));
 document.getElementById('nextBtn').onclick = () => navTo(offsetDate(currentDate, 1));
 document.getElementById('todayBtn').onclick = () => navTo(todayStr());
 document.getElementById('dateInput').onchange = e => navTo(e.target.value);
 
-document.getElementById('addClientBtn').onclick = addClient;
+// Keyboard: ← / → change day, T jumps to today, Esc closes the task menu
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { hidePopover(); return; }
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  if (e.key === 'ArrowLeft') navTo(offsetDate(currentDate, -1));
+  else if (e.key === 'ArrowRight') navTo(offsetDate(currentDate, 1));
+  else if (e.key === 't' || e.key === 'T') navTo(todayStr());
+});
+
+// If the app stays open past midnight, roll "today" forward when it's next viewed
+let lastSeenToday = todayStr();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const t = todayStr();
+  if (t !== lastSeenToday) { if (currentDate === lastSeenToday) navTo(t); lastSeenToday = t; }
+});
+setInterval(markNow, 60000);
+
+addClientBtn.onclick = openAddClient;
+addClientForm.onsubmit = e => { e.preventDefault(); const name = addClientInp.value.trim(); name ? addClient(name) : closeAddClient(); };
+addClientInp.onkeydown = e => { if (e.key === 'Escape') closeAddClient(); };
+document.getElementById('addClientCancel').onclick = closeAddClient;
 document.getElementById('clearBtn').onclick = clearDay;
 document.getElementById('exportBtn').onclick = exportCSV;
+document.getElementById('jumpSummaryBtn').onclick = () => document.getElementById('descSection').scrollIntoView({ behavior: 'smooth' });
 
 // Settings events
 document.getElementById('addSettingsClientBtn').onclick = () => {
   const inp = document.getElementById('newClientInp');
   const name = inp.value.trim();
   if (!name) { inp.focus(); return; }
-  if (config.defaultClients.includes(name)) { alert(`"${name}" already exists.`); inp.focus(); return; }
+  if (config.defaultClients.includes(name)) { toast(`"${name}" already exists.`); inp.focus(); return; }
   config.defaultClients.push(name);
   configSave();
   inp.value = '';
@@ -2010,10 +2207,10 @@ document.getElementById('applyClientsToTodayBtn').onclick = () => {
   config.defaultClients.forEach(c => { if (!day.clients.includes(c)) { day.clients.push(c); added++; } });
   dbSave();
   if (added) {
-    if (document.getElementById('tab-tracker').classList.contains('active')) renderAll();
-    alert(`Added ${added} client${added !== 1 ? 's' : ''} to ${currentDate}.`);
+    renderAll();
+    toast(`Added ${added} client${added !== 1 ? 's' : ''} to ${fmtDay(currentDate)}.`);
   } else {
-    alert('Today already has all default clients.');
+    toast(`${fmtDay(currentDate)} already has all default clients.`);
   }
 };
 
@@ -2024,8 +2221,8 @@ document.getElementById('applyClientsToAllBtn').onclick = () => {
     config.defaultClients.forEach(c => { if (!db[date].clients.includes(c)) { db[date].clients.push(c); totalAdded++; } });
   });
   dbSave();
-  if (document.getElementById('tab-tracker').classList.contains('active')) renderAll();
-  alert(`Done. Added ${totalAdded} client entries across all days.`);
+  renderAll();
+  toast(`Done. Added ${totalAdded} client entries across all days.`);
 };
 
 document.getElementById('resetConfigBtn').onclick = () => {
@@ -2082,7 +2279,10 @@ showNextQuote(true);
 setInterval(() => showNextQuote(false), 12000);
 
 // ── Init ─────────────────────────────────────────────────────
-dbLoad(); todosLoad(); customLoad(); syncCfgLoad(); configLoad(); renderAll();
+dbLoad(); todosLoad(); customLoad(); syncCfgLoad(); configLoad(); rangeLoad(); renderAll();
+const savedTab = localStorage.getItem('stt_tab');
+if (TABS.includes(savedTab) && savedTab !== 'tracker') showTab(savedTab);
+scrollToNow();
 autoSyncOnLoad();
 </script>
 <script>

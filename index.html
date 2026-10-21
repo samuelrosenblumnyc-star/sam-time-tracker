@@ -717,18 +717,19 @@ function buildDefaultConfig() {
   };
 }
 
-function configSave() {
+function configSave(mark = true) {
   localStorage.setItem('stt_config', JSON.stringify(config));
-  markLocalChange();
+  if (mark) markLocalChange();
 }
 
-function markLocalChange() { localStorage.setItem('stt_lastChange', new Date().toISOString()); }
+// Every real edit records a timestamp (compared against the Gist) and queues an auto-push.
+function markLocalChange() { localStorage.setItem('stt_lastChange', new Date().toISOString()); scheduleAutoPush(); }
 function getLastLocalChange() { return localStorage.getItem('stt_lastChange') || ''; }
 
 // ── Storage: Tracker ─────────────────────────────────────────
 let db = {};
 function dbLoad() { try { db = JSON.parse(localStorage.getItem('stt_v1') || '{}'); } catch { db = {}; } }
-function dbSave() { localStorage.setItem('stt_v1', JSON.stringify(db)); markLocalChange(); }
+function dbSave(mark = true) { localStorage.setItem('stt_v1', JSON.stringify(db)); if (mark) markLocalChange(); }
 
 function getDay(date) {
   if (!db[date]) {
@@ -737,7 +738,9 @@ function getDay(date) {
       ? [...(db[keys[keys.length - 1]].clients || config.defaultClients)]
       : [...config.defaultClients];
     db[date] = { clients, blocks: {}, descriptions: {}, descManual: {} };
-    dbSave();
+    // A blank new day isn't a real edit; marking it would make this browser look
+    // newer than the Gist and block the sync download.
+    dbSave(false);
   }
   if (!db[date].descManual) db[date].descManual = {};
   return db[date];
@@ -764,12 +767,12 @@ function todosLoad() {
     todosSave();
   }
 }
-function todosSave() { localStorage.setItem('stt_todos', JSON.stringify(todos)); markLocalChange(); }
+function todosSave(mark = true) { localStorage.setItem('stt_todos', JSON.stringify(todos)); if (mark) markLocalChange(); }
 
 // ── Storage: Custom saved "Other" tasks ──────────────────────
 let customTasks = {};
 function customLoad() { try { customTasks = JSON.parse(localStorage.getItem('stt_custom') || '{}'); } catch { customTasks = {}; } }
-function customSave() { localStorage.setItem('stt_custom', JSON.stringify(customTasks)); markLocalChange(); }
+function customSave(mark = true) { localStorage.setItem('stt_custom', JSON.stringify(customTasks)); if (mark) markLocalChange(); }
 function getCustomTasks(client) { const g = getTodoGroup(client); return customTasks[g] || []; }
 function addCustomTask(client, text) {
   const g = getTodoGroup(client);
@@ -1884,113 +1887,221 @@ function syncCfgLoad() {
 }
 function syncCfgSave() { localStorage.setItem(SYNC_STORE_KEY, JSON.stringify(syncCfg)); }
 
-function packAllData() {
-  return JSON.stringify({ v: 1, stt_v1: db, stt_todos: todos, stt_custom: customTasks, stt_config: config, exportedAt: new Date().toISOString() }, null, 2);
+const GIST_FILENAME = 'sam-time-tracker.json';
+const BACKUP_KEY = 'stt_backup';
+var syncBooted = false;   // var: markLocalChange can run during startup, before this section
+let syncChecked = false;  // compared with the Gist this session? auto-pushes wait for that
+let syncError = '';
+let connectBusy = false; // the Settings panel re-renders mid-check and can fire a second change event
+let pushTimer = null, pushing = null, pushAgain = false;
+
+const syncOn = () => !!(syncCfg.token && syncCfg.gistId && syncCfg.autoSync);
+const hasUnsynced = () => { const lc = getLastLocalChange(); return !!lc && lc > (syncCfg.lastSync || ''); };
+
+function packAllData(pretty = false) {
+  return JSON.stringify({ v: 1, stt_v1: db, stt_todos: todos, stt_custom: customTasks, stt_config: config, exportedAt: new Date().toISOString() }, null, pretty ? 2 : 0);
+}
+
+// Logged 15-min slots + tasks: used to spot a copy that is suspiciously smaller.
+function dataSize(d) {
+  let n = 0;
+  Object.values(d.stt_v1 || {}).forEach(day => { n += Object.keys(day?.blocks || {}).length; });
+  Object.values(d.stt_todos || {}).forEach(list => { n += (list || []).length; });
+  return n;
+}
+const localSize = () => dataSize({ stt_v1: db, stt_todos: todos });
+
+function saveBackup(reason) {
+  try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), reason, data: packAllData() })); }
+  catch (e) { console.warn('Backup not saved', e); }
 }
 
 function unpackAllData(json) {
-  const d = JSON.parse(json);
-  if (d.stt_v1 && typeof d.stt_v1 === 'object') { db = d.stt_v1; dbSave(); }
-  if (d.stt_todos && typeof d.stt_todos === 'object') { todos = d.stt_todos; todosSave(); }
-  if (d.stt_custom && typeof d.stt_custom === 'object') { customTasks = d.stt_custom; customSave(); }
-  if (d.stt_config?.defaultClients && d.stt_config?.burnRates) { config = d.stt_config; configSave(); }
+  const d = typeof json === 'string' ? JSON.parse(json) : json;
+  if (localSize() > 0) saveBackup('before loading synced data');
+  if (d.stt_v1 && typeof d.stt_v1 === 'object') { db = d.stt_v1; dbSave(false); }
+  if (d.stt_todos && typeof d.stt_todos === 'object') { todos = d.stt_todos; todosSave(false); }
+  if (d.stt_custom && typeof d.stt_custom === 'object') { customTasks = d.stt_custom; customSave(false); }
+  if (d.stt_config?.defaultClients && d.stt_config?.burnRates) { config = d.stt_config; configSave(false); }
+  // Local now matches the Gist exactly.
+  const stamp = d.exportedAt || new Date().toISOString();
+  localStorage.setItem('stt_lastChange', stamp);
+  syncCfg.lastSync = stamp;
+  syncCfgSave();
 }
 
-const GIST_FILENAME = 'sam-time-tracker.json';
+function gistHeaders(json) {
+  const h = { Authorization: `Bearer ${syncCfg.token}`, Accept: 'application/vnd.github+json' };
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+async function gistError(resp) {
+  const t = await resp.text().catch(() => '');
+  if (resp.status === 401) return 'GitHub rejected the token (401). It may have expired; create a new one with the gist scope.';
+  if (resp.status === 403) return 'GitHub refused access (403). Check that the token has the gist scope.';
+  if (resp.status === 404) return 'Gist not found (404). Check the Gist ID, and that the token belongs to the same GitHub account.';
+  return `GitHub ${resp.status}: ${t.slice(0, 160)}`;
+}
+
+async function fetchGistContent() {
+  const resp = await fetch(`https://api.github.com/gists/${syncCfg.gistId}`, { headers: gistHeaders(), cache: 'no-store' });
+  if (!resp.ok) throw new Error(await gistError(resp));
+  const file = (await resp.json()).files?.[GIST_FILENAME];
+  if (!file) throw new Error(`File "${GIST_FILENAME}" not found in the Gist.`);
+  // The API truncates files over ~1 MB; fetch the full file in that case.
+  if (file.truncated && file.raw_url) {
+    const raw = await fetch(file.raw_url, { cache: 'no-store' });
+    if (!raw.ok) throw new Error(`Couldn't download the full Gist file (${raw.status}).`);
+    return raw.text();
+  }
+  return file.content;
+}
 
 async function gistPush() {
-  const { token, gistId } = syncCfg;
-  if (!token) throw new Error('Enter a GitHub Personal Access Token first.');
-  const payload = {
-    description: 'SAM TIME TRACKER sync data',
-    public: false,
-    files: { [GIST_FILENAME]: { content: packAllData() } }
-  };
-  const url = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists';
-  const resp = await fetch(url, {
-    method: gistId ? 'PATCH' : 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`GitHub ${resp.status}: ${t.slice(0, 200)}`); }
-  const result = await resp.json();
-  if (!gistId) syncCfg.gistId = result.id;
-  syncCfg.lastSync = new Date().toISOString();
-  syncCfgSave();
-  return syncCfg.gistId;
-}
-
-async function gistPull() {
-  const { token, gistId } = syncCfg;
-  if (!token) throw new Error('Enter a GitHub Personal Access Token first.');
-  if (!gistId) throw new Error('No Gist ID set — push data first, or enter an existing Gist ID.');
-  const resp = await fetch(`https://api.github.com/gists/${gistId}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!resp.ok) { const t = await resp.text(); throw new Error(`GitHub ${resp.status}: ${t.slice(0, 200)}`); }
-  const result = await resp.json();
-  const content = result.files?.[GIST_FILENAME]?.content;
-  if (!content) throw new Error(`File "${GIST_FILENAME}" not found in Gist.`);
-  unpackAllData(content);
-  syncCfg.lastSync = new Date().toISOString();
-  syncCfgSave();
-}
-
-// Auto-sync helpers
-function flashSync(msg, isErr) {
-  const el = document.getElementById('syncIndicator');
-  if (!el) return;
-  el.textContent = msg;
-  el.className = isErr ? 'sync-err show' : 'show';
-  clearTimeout(el._t);
-  el._t = setTimeout(() => { el.className = ''; }, 4000);
-}
-
-async function autoSyncOnLoad() {
-  if (!syncCfg.token || !syncCfg.gistId || !syncCfg.autoSync) return;
-  try {
-    const { token, gistId } = syncCfg;
-    const resp = await fetch(`https://api.github.com/gists/${gistId}`, {
-      headers: { Authorization: `Bearer ${token}` },
+  if (!syncCfg.token) throw new Error('Enter a GitHub Personal Access Token first.');
+  if (pushing) { pushAgain = true; return pushing; }
+  pushing = (async () => {
+    setSyncState('syncing');
+    const startedAt = new Date().toISOString();
+    const { gistId } = syncCfg;
+    const resp = await fetch(gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists', {
+      method: gistId ? 'PATCH' : 'POST',
+      headers: gistHeaders(true),
+      body: JSON.stringify({ description: 'SAM TIME TRACKER sync data', public: false, files: { [GIST_FILENAME]: { content: packAllData() } } }),
     });
-    if (!resp.ok) throw new Error('fetch failed');
+    if (!resp.ok) throw new Error(await gistError(resp));
     const result = await resp.json();
-    const content = result.files?.[GIST_FILENAME]?.content;
-    if (!content) throw new Error('no file');
-    const remote = JSON.parse(content);
-    const localChange = getLastLocalChange();
-    if (remote.exportedAt && (!localChange || remote.exportedAt > localChange)) {
-      unpackAllData(content);
-      syncCfg.lastSync = new Date().toISOString();
-      syncCfgSave();
-      refreshVisible();
-      flashSync('Synced');
-    } else {
-      flashSync('Up to date');
-    }
-  } catch {
-    flashSync('Sync failed', true);
+    if (!gistId) syncCfg.gistId = result.id;
+    syncCfg.lastSync = startedAt;
+    syncCfgSave();
+    syncChecked = true;
+    setSyncState('ok', 'Saved to Gist');
+    return syncCfg.gistId;
+  })();
+  try { return await pushing; }
+  catch (e) { setSyncState('error', e.message); throw e; }
+  finally {
+    pushing = null;
+    if (pushAgain) { pushAgain = false; if (hasUnsynced()) gistPush().catch(() => {}); }
   }
 }
 
+async function gistPull() {
+  if (!syncCfg.token) throw new Error('Enter a GitHub Personal Access Token first.');
+  if (!syncCfg.gistId) throw new Error('No Gist ID set — push data first, or enter an existing Gist ID.');
+  setSyncState('syncing');
+  try {
+    unpackAllData(await fetchGistContent());
+    syncChecked = true;
+    setSyncState('ok', 'Synced');
+  } catch (e) { setSyncState('error', e.message); throw e; }
+}
+
+// Status chip in the header
+function setSyncState(state, msg = '') {
+  const el = document.getElementById('syncIndicator');
+  syncError = state === 'error' ? msg : '';
+  if (!el) return;
+  clearTimeout(el._t);
+  if (state === 'syncing') { el.textContent = 'Syncing…'; el.className = 'show'; el.title = ''; return; }
+  if (state === 'pending') { el.textContent = 'Saving…'; el.className = 'show'; el.title = ''; return; }
+  if (state === 'error') { el.textContent = '⚠ Sync failed'; el.className = 'sync-err show'; el.title = msg; return; }
+  el.textContent = msg || 'Up to date'; el.className = 'show'; el.title = '';
+  el._t = setTimeout(() => { el.className = ''; }, 4000);
+}
+
+// Compare with the Gist and move data in whichever direction is needed.
+async function autoSync({ manual = false } = {}) {
+  if (!syncCfg.token || !syncCfg.gistId || (!syncCfg.autoSync && !manual)) return false;
+  setSyncState('syncing');
+  try {
+    const content = await fetchGistContent();
+    const remote = JSON.parse(content);
+    const local = getLastLocalChange();
+    const rSize = dataSize(remote), lSize = localSize();
+    const remoteNewer = !!remote.exportedAt && (!local || remote.exportedAt > local);
+
+    if (remoteNewer) {
+      // Never silently swap a full browser for a nearly-empty Gist (e.g. one an empty browser overwrote).
+      if (lSize > 20 && rSize < lSize * 0.5 && confirm(
+        `Your synced Gist has much less data than this browser (${rSize} vs ${lSize} entries). Another browser may have overwritten it.\n\n` +
+        `OK: keep this browser's data and upload it to the Gist (recommended)\nCancel: replace this browser's data with the Gist copy`)) {
+        markLocalChange();
+        await gistPush();
+        return false;
+      }
+      unpackAllData(content);
+      syncChecked = true;
+      refreshVisible();
+      setSyncState('ok', 'Synced');
+      return true;
+    }
+
+    syncChecked = true;
+    if (hasUnsynced() || !syncCfg.lastSync) {
+      // This browser has edits the Gist doesn't. Guard against an almost-empty browser wiping a full Gist.
+      if (rSize > 20 && lSize < rSize * 0.5 && confirm(
+        `This browser has much less data than your synced Gist (${lSize} vs ${rSize} entries).\n\n` +
+        `OK: load the Gist data into this browser (recommended)\nCancel: upload this browser's data and replace the Gist`)) {
+        unpackAllData(content);
+        refreshVisible();
+        setSyncState('ok', 'Synced');
+        return true;
+      }
+      await gistPush();
+    } else {
+      setSyncState('ok', 'Up to date');
+    }
+    return false;
+  } catch (e) {
+    setSyncState('error', e.message);
+    if (manual) throw e;
+    return false;
+  }
+}
+
+// Save a few seconds after each edit, instead of only when leaving the page.
+function scheduleAutoPush() {
+  if (!syncBooted || !syncOn()) return;
+  clearTimeout(pushTimer);
+  setSyncState('pending');
+  pushTimer = setTimeout(() => {
+    if (syncChecked) gistPush().catch(() => {});
+    else autoSync();
+  }, 4000);
+}
+
+// Last-chance save when the page is hidden. Only if there is something new to send:
+// a browser with nothing new must never overwrite the Gist.
 function autoSyncOnHide() {
-  if (!syncCfg.token || !syncCfg.gistId || !syncCfg.autoSync) return;
-  const payload = JSON.stringify({
-    files: { [GIST_FILENAME]: { content: packAllData() } }
-  });
+  if (!syncOn() || !syncChecked || !hasUnsynced()) return;
+  clearTimeout(pushTimer);
+  const startedAt = new Date().toISOString();
+  const body = JSON.stringify({ files: { [GIST_FILENAME]: { content: packAllData() } } });
   fetch(`https://api.github.com/gists/${syncCfg.gistId}`, {
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${syncCfg.token}`, 'Content-Type': 'application/json' },
-    body: payload,
-    keepalive: true,
-  }).catch(() => {});
-  syncCfg.lastSync = new Date().toISOString();
-  syncCfgSave();
+    method: 'PATCH', headers: gistHeaders(true), body,
+    keepalive: body.length < 60000, // browsers reject keepalive bodies over 64 KB
+  }).then(r => { if (r.ok) { syncCfg.lastSync = startedAt; syncCfgSave(); } }).catch(() => {});
 }
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') autoSyncOnHide();
+  else if (syncBooted) autoSync();
 });
+window.addEventListener('online', () => { if (syncBooted) autoSync(); });
+
+function restoreBackup() {
+  let b;
+  try { b = JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); } catch {}
+  if (!b) return;
+  if (!confirm(`Restore this browser's data from ${new Date(b.savedAt).toLocaleString()} (${b.reason})?\n\nThe restored data will then be uploaded to your Gist.`)) return;
+  const d = JSON.parse(b.data);
+  db = d.stt_v1 || {}; todos = d.stt_todos || {}; customTasks = d.stt_custom || {};
+  if (d.stt_config?.defaultClients) config = d.stt_config;
+  dbSave(false); todosSave(false); customSave(false); configSave(false);
+  markLocalChange();
+  refreshVisible();
+}
 
 function renderSyncPanel() {
   const panel = document.getElementById('syncPanel');
@@ -2008,6 +2119,7 @@ function renderSyncPanel() {
   const tokInp = document.createElement('input'); tokInp.type = 'password';
   tokInp.className = 'settings-text-inp'; tokInp.placeholder = 'ghp_…'; tokInp.value = syncCfg.token;
   tokInp.oninput = () => { syncCfg.token = tokInp.value.trim(); syncCfgSave(); };
+  tokInp.onchange = () => connectIfReady();
   tokLbl.appendChild(tokInp); panel.appendChild(tokLbl);
 
   // Gist ID field
@@ -2016,11 +2128,27 @@ function renderSyncPanel() {
   const gistInp = document.createElement('input'); gistInp.type = 'text';
   gistInp.className = 'settings-text-inp'; gistInp.placeholder = 'Leave blank to create a new Gist'; gistInp.value = syncCfg.gistId;
   gistInp.oninput = () => { syncCfg.gistId = gistInp.value.trim(); syncCfgSave(); };
+  gistInp.onchange = () => connectIfReady();
+  // As soon as both fields are filled in, compare with the Gist (a new browser downloads your data).
+  const connectIfReady = async () => {
+    if (!syncCfg.token || !syncCfg.gistId || connectBusy) return;
+    connectBusy = true;
+    statusEl.textContent = 'Checking Gist…'; statusEl.className = 'sync-status';
+    // A download re-renders this panel, so write to whichever status line is current.
+    const show = (text, cls) => { const el = document.querySelector('#syncPanel .sync-status') || statusEl; el.textContent = text; el.className = `sync-status ${cls}`; };
+    try {
+      const pulled = await autoSync({ manual: true });
+      show(pulled ? 'Connected. Your data was downloaded from the Gist.' : 'Connected. This browser is in sync.', 'sync-ok');
+    } catch (e) {
+      show(`Couldn't connect: ${e.message}`, 'sync-err');
+    } finally { connectBusy = false; }
+  };
   gistLbl.appendChild(gistInp); panel.appendChild(gistLbl);
 
   // Status line
   const statusEl = document.createElement('p'); statusEl.className = 'sync-status';
-  statusEl.textContent = syncCfg.lastSync ? `Last synced: ${new Date(syncCfg.lastSync).toLocaleString()}` : '';
+  statusEl.textContent = syncError ? `Last sync failed: ${syncError}` : syncCfg.lastSync ? `Last synced: ${new Date(syncCfg.lastSync).toLocaleString()}` : '';
+  if (syncError) statusEl.className = 'sync-status sync-err';
 
   // Buttons
   const btnRow = document.createElement('div'); btnRow.className = 'settings-actions'; btnRow.style.marginTop = '12px';
@@ -2068,8 +2196,21 @@ function renderSyncPanel() {
   autoCb.style.cssText = 'accent-color:#1b3a5c; width:15px; height:15px;';
   autoCb.onchange = () => { syncCfg.autoSync = autoCb.checked; syncCfgSave(); };
   autoRow.appendChild(autoCb);
-  autoRow.appendChild(document.createTextNode('Auto-sync: pull on startup, push when leaving'));
+  autoRow.appendChild(document.createTextNode('Auto-sync: download newer data when opened, save a few seconds after each change'));
   panel.appendChild(autoRow);
+
+  // Safety net: data replaced by a sync can be brought back
+  let backup = null;
+  try { backup = JSON.parse(localStorage.getItem(BACKUP_KEY) || 'null'); } catch {}
+  if (backup) {
+    const row = document.createElement('div');
+    row.style.cssText = 'margin-top:14px; padding-top:12px; border-top:1px solid #f0f0f0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11px; color:#888;';
+    const btn = document.createElement('button'); btn.className = 'ctrl-btn'; btn.textContent = '↺ Restore previous data';
+    btn.onclick = restoreBackup;
+    row.appendChild(btn);
+    row.appendChild(document.createTextNode(`This browser's data from ${new Date(backup.savedAt).toLocaleString()}, saved ${backup.reason}.`));
+    panel.appendChild(row);
+  }
 }
 
 // ── Event Delegation ─────────────────────────────────────────
@@ -2283,7 +2424,8 @@ dbLoad(); todosLoad(); customLoad(); syncCfgLoad(); configLoad(); rangeLoad(); r
 const savedTab = localStorage.getItem('stt_tab');
 if (TABS.includes(savedTab) && savedTab !== 'tracker') showTab(savedTab);
 scrollToNow();
-autoSyncOnLoad();
+syncBooted = true;
+autoSync();
 </script>
 <script>
   if ('serviceWorker' in navigator) {

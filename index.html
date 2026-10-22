@@ -171,6 +171,9 @@
   tbody tr.hour-start td.client-cell.sel:not(.run-start) { border-top-color: #2563eb; }
   tbody tr.hour-start td.client-cell.sel.no-task:not(.run-start) { border-top-color: #93b4f5; }
   td.client-cell.sel.run-end { border-bottom: 2px solid #fff; }
+  /* A block that ends at the top of an hour runs right up to the gray hour line (it already separates blocks) */
+  td.client-cell.sel.run-end.hour-end { border-bottom: 2px solid #2563eb; }
+  td.client-cell.sel.no-task.run-end.hour-end { border-bottom-color: #93b4f5; }
   td.client-cell.sel:hover { filter: brightness(1.08); }
   /* Label sits in a block's first cell and wraps down over the rest of the block */
   .cell-lbl {
@@ -1033,7 +1036,8 @@ function decorateCells(day) {
     const key = runKey(b), label = taskLabel(c, b);
     const runStart = !cell.parentElement.previousElementSibling || runKey(blocks[SLOTS[si - 1]?.time]) !== key;
     const runEnd = runKey(blocks[SLOTS[si + 1]?.time]) !== key;
-    cell.className = 'client-cell sel' + (label ? '' : ' no-task') + (runStart ? ' run-start' : '') + (runEnd ? ' run-end' : '');
+    const hourEnd = SLOTS[si + 1] && SLOTS[si + 1].mins % 60 === 0;   // next row starts a new hour
+    cell.className = 'client-cell sel' + (label ? '' : ' no-task') + (runStart ? ' run-start' : '') + (runEnd ? ' run-end' : '') + (runEnd && hourEnd ? ' hour-end' : '');
     cell.title = `${c} — ${label || 'no task yet (click to pick one)'}`;
     if (runStart) {
       let run = 1, row = cell.parentElement.nextElementSibling;

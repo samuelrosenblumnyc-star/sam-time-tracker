@@ -421,9 +421,6 @@
   .todo-sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #666; }
   .todo-sort-btn { font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; border: 1px solid #ddd; background: #fff; font-family: inherit; }
   .todo-sort-btn.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
-  .todo-group-row td { text-align: left; padding: 14px 8px 6px; border-bottom: 2px solid #e5e7eb; font-size: 12px; font-weight: bold; color: #1b3a5c; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
-  .todo-group-row:first-child td { padding-top: 4px; }
-  .todo-group-row td:hover { color: #2563eb; }
   .todo-all-group-hdr { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: .04em; padding: 10px 8px 4px; }
 
   /* ── Sync Panel ── */
@@ -1567,19 +1564,20 @@ function renderTodoList(group) {
   });
   container.appendChild(sortBar);
 
-  // Gather tasks, grouped by burn rate group; open tasks first within each group
-  const ordered = s => {
-    const rows = s.keys.flatMap(k => clientTodos(k).map(t => ({ ...t, _g: k })));
-    return [...sortedTasks(rows.filter(t => !t.done)), ...sortedTasks(rows.filter(t => t.done))];
-  };
-  const blocks = (isAll ? sections : [sec]).map(s => ({ s, rows: ordered(s) })).filter(b => b.rows.length);
+  // Gather tasks. A group tab lists that group's tasks; the All tab lists every task in one flat
+  // list (not split by group), in the chosen order (due date by default). Open tasks come first,
+  // completed ones after them.
+  const gather = secs => secs.flatMap(s => s.keys.flatMap(k => clientTodos(k).map(t => ({ ...t, _g: k }))));
+  const ordered = rows => [...sortedTasks(rows.filter(t => !t.done)), ...sortedTasks(rows.filter(t => t.done))];
+  const allRows = ordered(gather(isAll ? sections : [sec]));
+  const blocks = allRows.length ? [{ rows: allRows }] : [];
 
   if (!blocks.length) {
     const p = document.createElement('p'); p.className = 'todo-empty'; p.textContent = 'No tasks yet.'; container.appendChild(p);
   } else {
     const table = document.createElement('table'); table.className = 'todo-table';
     const colHdr = multi
-      ? `<th style="width:28px"></th><th style="width:90px">Client</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
+      ? `<th style="width:28px"></th><th style="width:90px">${isAll ? 'Group' : 'Client'}</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
       : `<th style="width:28px"></th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`;
     table.innerHTML = `<thead><tr>${colHdr}</tr></thead>`;
     const tBody = document.createElement('tbody');
@@ -1595,7 +1593,7 @@ function renderTodoList(group) {
 
       if (multi) {
         const tdG = document.createElement('td'); tdG.style.cssText = 'font-size:11px; color:#666;';
-        tdG.textContent = g; tr.appendChild(tdG);
+        tdG.textContent = isAll ? sectionForKey(g).label : g; tr.appendChild(tdG);
       }
 
       const tdTask = document.createElement('td'); const inp = document.createElement('input');
@@ -1650,18 +1648,7 @@ function renderTodoList(group) {
       tBody.appendChild(tr);
     };
 
-    blocks.forEach(({ s, rows }) => {
-      if (isAll) {
-        const hdr = document.createElement('tr'); hdr.className = 'todo-group-row';
-        const td = document.createElement('td'); td.colSpan = 8;
-        const open = rows.filter(t => !t.done).length;
-        td.innerHTML = esc(s.label) + (open ? `<span class="pill-count">${open}</span>` : '');
-        td.title = `Open the ${s.label} list`;
-        td.onclick = () => { activeTodoGroup = s.id; renderTodosTab(); };
-        hdr.appendChild(td); tBody.appendChild(hdr);
-      }
-      rows.forEach(addRow);
-    });
+    blocks.forEach(({ rows }) => rows.forEach(addRow));
     table.appendChild(tBody); container.appendChild(table);
   }
 

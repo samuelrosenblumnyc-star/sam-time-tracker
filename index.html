@@ -289,11 +289,19 @@
   .todo-notes-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: inherit; width: 100%; min-width: 120px; color: inherit; }
   .todo-notes-inp:focus { outline: none; border-color: #bfdbfe; background: #f8fbff; }
   .done-row .todo-notes-inp { text-decoration: line-through; }
-  .add-task-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+  .add-task-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; padding-bottom: 12px; }
   .add-task-inp { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
   .add-task-inp:focus { outline: none; border-color: #2563eb; }
   .add-date-inp { border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; font-size: 12px; font-family: inherit; }
   .add-date-inp:focus { outline: none; border-color: #2563eb; }
+  .due-wrap { position: relative; display: inline-flex; align-items: center; }
+  .due-text { width: 132px; padding-right: 30px; }
+  .due-text.bad, .due-text.bad:focus { border-color: #dc2626; background: #fff5f5; }
+  .due-cal-btn { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer; font-size: 13px; padding: 2px 4px; opacity: .6; line-height: 1; }
+  .due-cal-btn:hover { opacity: 1; }
+  .due-picker { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+  .due-hint { position: absolute; left: 2px; top: 100%; margin-top: 2px; font-size: 10px; color: #6b7280; white-space: nowrap; }
+  .due-hint.bad { color: #dc2626; font-weight: bold; }
   .add-task-btn { background: #1b3a5c; color: #fff; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; }
   .add-task-btn:hover { background: #24507e; }
 
@@ -473,6 +481,8 @@
     .add-task-row { flex-wrap: wrap; gap: 6px; }
     .add-task-inp { flex: 1 1 100%; min-width: 0; }
     .add-date-inp { flex: 1; }
+    .due-wrap { flex: 1; }
+    .due-wrap .due-text { width: 100%; }
     .todo-table { font-size: 12px; }
     .todo-table th, .todo-table td { padding: 4px 4px; }
     .todo-sort-bar { font-size: 11px; }
@@ -817,6 +827,41 @@ let showAllDescs = false;
 function dateStr(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function todayStr() { return dateStr(new Date()); }
 function offsetDate(date, d) { const dt = new Date(date + 'T12:00:00'); dt.setDate(dt.getDate() + d); return dateStr(dt); }
+
+// Typed due dates: "10/25", "10/25/26", "Oct 25", "today", "tomorrow", "fri".
+// Without a year, picks the next upcoming one (this year, or next year if the date
+// passed more than ~2 months ago). Returns 'YYYY-MM-DD', '' for blank, or null if unreadable.
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+function parseDueDate(input) {
+  const v = input.trim().toLowerCase().replace(/,/g, ' ').replace(/\s+/g, ' ');
+  if (!v) return '';
+  const today = todayStr();
+  if (/^(today|tod)$/.test(v)) return today;
+  if (/^(tomorrow|tmrw?|tom)$/.test(v)) return offsetDate(today, 1);
+  const wd = WEEKDAYS.findIndex(w => v.startsWith(w) && /^[a-z]+$/.test(v));
+  if (wd !== -1) {
+    const now = new Date(today + 'T12:00:00').getDay();
+    return offsetDate(today, (wd - now + 7) % 7);
+  }
+  let m, d, y = null, mm;
+  if ((mm = v.match(/^(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2}|\d{4}))?$/))) { m = +mm[1]; d = +mm[2]; y = mm[3]; }
+  else if ((mm = v.match(/^([a-z]+)\.? (\d{1,2})(?:st|nd|rd|th)?(?: (\d{2}|\d{4}))?$/))) { m = MONTHS.indexOf(mm[1].slice(0, 3)) + 1; d = +mm[2]; y = mm[3]; }
+  else if ((mm = v.match(/^(\d{1,2})(?:st|nd|rd|th)? ([a-z]+)\.?(?: (\d{2}|\d{4}))?$/))) { d = +mm[1]; m = MONTHS.indexOf(mm[2].slice(0, 3)) + 1; y = mm[3]; }
+  else if (/^\d{4}-\d{2}-\d{2}$/.test(v)) { [y, m, d] = v.split('-').map(Number); }
+  else return null;
+  if (!m || m < 1 || m > 12 || d < 1) return null;
+  const valid = yr => d <= new Date(yr, m, 0).getDate();
+  if (y != null) {
+    y = +y; if (y < 100) y += 2000;
+    return valid(y) ? `${y}-${pad(m)}-${pad(d)}` : null;
+  }
+  y = +today.slice(0, 4);
+  // No year given: use this year unless that date is well in the past
+  if (!valid(y) || `${y}-${pad(m)}-${pad(d)}` < offsetDate(today, -60)) y += 1;
+  if (!valid(y)) { y += 1; if (!valid(y)) y += 2; } // Feb 29
+  return valid(y) ? `${y}-${pad(m)}-${pad(d)}` : null;
+}
 
 function rangeLoad() {
   try { const r = JSON.parse(localStorage.getItem('stt_range') || 'null'); if (r) { rangeStart = r.start; rangeEnd = r.end; } } catch {}
@@ -1578,7 +1623,33 @@ function renderTodoList(group) {
   if (!isAll) {
     const addRow = document.createElement('div'); addRow.className = 'add-task-row';
     const taskInp = document.createElement('input'); taskInp.type = 'text'; taskInp.className = 'add-task-inp'; taskInp.placeholder = 'New task…';
-    const dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.className = 'add-date-inp';
+    // Due date: free text, no year needed; the calendar button still offers a picker
+    const dateWrap = document.createElement('span'); dateWrap.className = 'due-wrap';
+    const dateInp = document.createElement('input'); dateInp.type = 'text'; dateInp.className = 'add-date-inp due-text';
+    dateInp.placeholder = 'Due (e.g. 10/25)'; dateInp.autocomplete = 'off';
+    dateInp.title = 'Type a date like 10/25, Oct 25, tomorrow or fri. The year is optional.';
+    const pickInp = document.createElement('input'); pickInp.type = 'date'; pickInp.className = 'due-picker'; pickInp.tabIndex = -1;
+    const pickBtn = document.createElement('button'); pickBtn.type = 'button'; pickBtn.className = 'due-cal-btn'; pickBtn.title = 'Pick from calendar'; pickBtn.textContent = '📅';
+    const dateHint = document.createElement('span'); dateHint.className = 'due-hint';
+    const showDue = () => {
+      const iso = parseDueDate(dateInp.value);
+      dateInp.classList.toggle('bad', iso === null);
+      dateHint.textContent = iso === null ? 'Not a date' : iso ? fmtDay(iso) + (iso.slice(0, 4) !== todayStr().slice(0, 4) ? `, ${iso.slice(0, 4)}` : '') : '';
+      dateHint.classList.toggle('bad', iso === null);
+      return iso;
+    };
+    dateInp.oninput = showDue;
+    pickBtn.onclick = () => {
+      const iso = parseDueDate(dateInp.value); if (iso) pickInp.value = iso;
+      try { pickInp.showPicker(); } catch { pickInp.focus(); pickInp.click(); }
+    };
+    pickInp.onchange = () => {
+      if (!pickInp.value) return;
+      const [y, m, d] = pickInp.value.split('-').map(Number);
+      dateInp.value = y === +todayStr().slice(0, 4) ? `${m}/${d}` : `${m}/${d}/${y}`;
+      showDue(); taskInp.focus();
+    };
+    dateWrap.appendChild(dateInp); dateWrap.appendChild(pickBtn); dateWrap.appendChild(pickInp); dateWrap.appendChild(dateHint);
     const timeInp = document.createElement('input'); timeInp.type = 'time'; timeInp.className = 'add-date-inp';
     const addBtn = document.createElement('button'); addBtn.className = 'add-task-btn'; addBtn.textContent = '+ Add';
     // A group can span several client lists; pick which one the new task goes in.
@@ -1589,12 +1660,15 @@ function renderTodoList(group) {
     }
     addBtn.onclick = () => {
       const text = taskInp.value.trim(); if (!text) { taskInp.focus(); return; }
-      addTask(listSel ? listSel.value : sec.keys[0], text, dateInp.value, timeInp.value);
+      const due = showDue();
+      if (due === null) { dateInp.focus(); dateInp.select(); return; }
+      addTask(listSel ? listSel.value : sec.keys[0], text, due, timeInp.value);
       renderTodosTab(); renderBody(getDay(currentDate));
       document.querySelector('#todoContent .add-task-inp')?.focus();
     };
     taskInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
-    addRow.appendChild(taskInp); if (listSel) addRow.appendChild(listSel); addRow.appendChild(dateInp); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
+    dateInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
+    addRow.appendChild(taskInp); if (listSel) addRow.appendChild(listSel); addRow.appendChild(dateWrap); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
     container.appendChild(addRow);
   }
 }

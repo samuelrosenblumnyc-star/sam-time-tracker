@@ -1,5 +1,5 @@
 const CACHE = 'stt-v2';
-const ASSETS = ['./', './index.html', './manifest.json', './sw.js', './icons/icon.svg'];
+const ASSETS = ['./', './index.html', './manifest.json', './sw.js', './icons/icon.svg', './graveyard.gif', './graveyard-final-frame.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

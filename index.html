@@ -121,7 +121,7 @@
 
   /* ── Grid ── */
   #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 80px); background: #fff; }
-  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(144px + var(--cols, 8) * 64px); }
+  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(152px + var(--cols, 8) * 64px); }
 
   thead th {
     position: sticky; top: 0; z-index: 50;
@@ -129,7 +129,7 @@
     padding: 6px 14px 6px 4px; font-size: 11px; line-height: 1.2; border-right: 1px solid #2a4e78;
     text-align: center; vertical-align: bottom;
   }
-  thead th.time-hdr { width: 88px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
+  thead th.time-hdr { width: 96px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
   thead th.total-hdr { width: 56px; padding-right: 4px; }
   .hdr-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
   .rm-btn {
@@ -153,15 +153,17 @@
   }
   tr.hour-start td.time-cell { color: #334155; font-weight: bold; }
   tr.now-row td.time-cell { color: #dc2626; font-weight: bold; box-shadow: inset 3px 0 0 #dc2626; }
-  tr.now-row td { border-bottom-color: #fca5a5; }
-  /* Arrow tag on the red line showing the current time */
-  tr.now-row td.time-cell { z-index: 31; }
-  tr.now-row td.time-cell::after {
-    content: attr(data-now); position: absolute; left: 3px; bottom: -8px; z-index: 2;
+  /* Red "now" line: moves down through the slot minute by minute, like a clock hand */
+  #tableWrap { position: relative; }
+  #nowLine { position: absolute; left: 0; top: 0; height: 0; border-top: 2px solid #dc2626; z-index: 35; pointer-events: none; display: none; }
+  #nowTag {
+    display: block; position: sticky; left: 3px; width: max-content; margin-top: -8px;
     height: 14px; line-height: 14px; padding: 0 9px 0 5px; box-sizing: border-box;
-    background: #dc2626; color: #fff; font-size: 9.5px; font-weight: bold; letter-spacing: .01em; pointer-events: none;
+    background: #dc2626; color: #fff; font-size: 9.5px; font-weight: bold; letter-spacing: .01em;
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%);
   }
+  #nowTag::before { content: attr(data-full); }
+  td.time-cell.under-tag { color: transparent !important; }  /* a time label the line is passing through */
   td.client-cell { cursor: pointer; position: relative; user-select: none; }
   td.client-cell:hover:not(.sel) { background: #dbeafe; }
   td.client-cell.sel { background: #2563eb; border-bottom-color: #2563eb; border-right-color: #fff; }
@@ -169,6 +171,9 @@
   tbody tr.hour-start td.client-cell.sel:not(.run-start) { border-top-color: #2563eb; }
   tbody tr.hour-start td.client-cell.sel.no-task:not(.run-start) { border-top-color: #93b4f5; }
   td.client-cell.sel.run-end { border-bottom: 2px solid #fff; }
+  /* A block that ends at the top of an hour runs right up to the gray hour line (it already separates blocks) */
+  td.client-cell.sel.run-end.hour-end { border-bottom: 2px solid #2563eb; }
+  td.client-cell.sel.no-task.run-end.hour-end { border-bottom-color: #93b4f5; }
   td.client-cell.sel:hover { filter: brightness(1.08); }
   /* Label sits in a block's first cell and wraps down over the rest of the block */
   .cell-lbl {
@@ -187,6 +192,20 @@
   }
   tfoot td:first-child { text-align: right; padding-right: 8px; left: 0; z-index: 45; }
   tfoot td.zero { color: #c0c7d2; font-weight: normal; }
+
+  /* ── Graveyard-shift easter egg ── */
+  #graveyardPop {
+    position: fixed; left: 50%; top: calc(var(--top-h) + 10px); z-index: 950;
+    transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.2,.9,.3,1.2);
+    display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 24px);
+    background: linear-gradient(180deg, #1e1b3a, #14122b); color: #f3f0ff; padding: 8px 10px 8px 8px; border-radius: 14px;
+    border: 1px solid #3b3566; box-shadow: 0 12px 32px rgba(10, 8, 30, .45);
+  }
+  #graveyardPop.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #graveyardPop .gy-img { display: block; width: 120px; height: 90px; flex-shrink: 0; border-radius: 9px; background: #2a2650; }
+  #graveyardPop .gy-text { font-size: 14px; font-weight: bold; line-height: 1.3; }
+  #graveyardPop .gy-x { background: none; border: none; color: #a8a2d6; font-size: 14px; cursor: pointer; padding: 4px 6px; border-radius: 6px; align-self: flex-start; }
+  #graveyardPop .gy-x:hover { color: #fff; background: rgba(255,255,255,.1); }
 
   /* ── Toast ── */
   #toast {
@@ -419,9 +438,6 @@
   .todo-sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #666; }
   .todo-sort-btn { font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; border: 1px solid #ddd; background: #fff; font-family: inherit; }
   .todo-sort-btn.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
-  .todo-group-row td { text-align: left; padding: 14px 8px 6px; border-bottom: 2px solid #e5e7eb; font-size: 12px; font-weight: bold; color: #1b3a5c; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
-  .todo-group-row:first-child td { padding-top: 4px; }
-  .todo-group-row td:hover { color: #2563eb; }
   .todo-all-group-hdr { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: .04em; padding: 10px 8px 4px; }
 
   /* ── Sync Panel ── */
@@ -434,6 +450,7 @@
 
   /* ── Mobile ─────────────────────────────────────────────────── */
   @media (max-width: 640px) {
+    #graveyardPop .gy-img { width: 96px; height: 72px; }
     /* Top bar: hide quote + title, keep date nav and the day total */
     #quoteDisplay, #topbar h1, .nav-lbl, #dayName { display: none; }
     #topbar { gap: 6px; padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px; }
@@ -460,7 +477,8 @@
     #tableWrap table { min-width: calc(92px + var(--cols, 8) * 46px); }
     td { padding: 0 1px; height: 30px; }
     td.time-cell { font-size: 10px; padding-right: 5px; }
-    tr.now-row td.time-cell::after { content: attr(data-now-s); left: 2px; font-size: 9px; padding: 0 8px 0 4px; }
+    #nowTag { left: 2px; font-size: 9px; padding: 0 8px 0 4px; }
+    #nowTag::before { content: attr(data-short); }
     .cell-lbl { display: none; }
     thead th { padding: 5px 2px; font-size: 10px; }
     thead th.time-hdr { width: 50px; padding: 5px 5px; }
@@ -581,6 +599,7 @@
       <tbody id="tbody"></tbody>
       <tfoot id="tfoot"></tfoot>
     </table>
+    <div id="nowLine"><span id="nowTag"></span></div>
   </div>
   <div id="descSection">
     <h2>Daily Client Descriptions</h2>
@@ -644,6 +663,7 @@
 <!-- ── Task popover ── -->
 <div id="taskPopover"></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="graveyardPop" role="status" aria-live="polite" hidden></div>
 
 <script>
 // ── Constants ────────────────────────────────────────────────
@@ -1032,7 +1052,8 @@ function decorateCells(day) {
     const key = runKey(b), label = taskLabel(c, b);
     const runStart = !cell.parentElement.previousElementSibling || runKey(blocks[SLOTS[si - 1]?.time]) !== key;
     const runEnd = runKey(blocks[SLOTS[si + 1]?.time]) !== key;
-    cell.className = 'client-cell sel' + (label ? '' : ' no-task') + (runStart ? ' run-start' : '') + (runEnd ? ' run-end' : '');
+    const hourEnd = SLOTS[si + 1] && SLOTS[si + 1].mins % 60 === 0;   // next row starts a new hour
+    cell.className = 'client-cell sel' + (label ? '' : ' no-task') + (runStart ? ' run-start' : '') + (runEnd ? ' run-end' : '') + (runEnd && hourEnd ? ' hour-end' : '');
     cell.title = `${c} — ${label || 'no task yet (click to pick one)'}`;
     if (runStart) {
       let run = 1, row = cell.parentElement.nextElementSibling;
@@ -1046,15 +1067,39 @@ function decorateCells(day) {
   });
 }
 
+// The current slot gets a red label; the red line sits at the exact time, so it starts on the
+// slot's top edge (e.g. the 1:15 line at 1:15) and moves down every minute to reach the next at 1:30.
 function markNow() {
   const idx = currentDate === todayStr() ? nowSlotIdx() : -1;
-  const d = new Date(), mm = pad(d.getMinutes()), h12 = d.getHours() % 12 || 12;
+  let nowRow = null;
   document.querySelectorAll('#tbody tr[data-time]').forEach(r => {
     const isNow = slotIdx(r.dataset.time) === idx;
     r.classList.toggle('now-row', isNow);
-    const tc = r.querySelector('.time-cell');
-    if (isNow) { tc.dataset.now = `${h12}:${mm} ${d.getHours() < 12 ? 'AM' : 'PM'}`; tc.dataset.nowS = `${h12}:${mm}`; }
-    else { delete tc.dataset.now; delete tc.dataset.nowS; }
+    if (isNow) nowRow = r;
+  });
+  placeNowLine(nowRow);
+}
+
+function placeNowLine(row) {
+  const wrap = document.getElementById('tableWrap'), line = document.getElementById('nowLine'), tag = document.getElementById('nowTag');
+  document.querySelectorAll('td.time-cell.under-tag').forEach(c => c.classList.remove('under-tag'));
+  const rowBox = row && row.getBoundingClientRect();
+  if (!row || !rowBox.height) { line.style.display = 'none'; return; }  // not today, outside the shown hours, or tab hidden
+  const d = new Date();
+  const frac = ((d.getMinutes() % 15) + d.getSeconds() / 60) / 15;
+  const y = rowBox.top - wrap.getBoundingClientRect().top + wrap.scrollTop + frac * rowBox.height;
+  line.style.display = 'block';
+  line.style.top = `${y - 1}px`;                                   // centre the 2px line on the exact time
+  line.style.width = `${document.querySelector('#tableWrap table').offsetWidth}px`;
+  const h12 = d.getHours() % 12 || 12, mm = pad(d.getMinutes());
+  tag.dataset.full = `${h12}:${mm} ${d.getHours() < 12 ? 'AM' : 'PM'}`;
+  tag.dataset.short = `${h12}:${mm}`;
+  // Hide the time label the line is crossing so it isn't struck through (wider margin on phones,
+  // where the tag also covers part of the column)
+  const reach = window.matchMedia('(max-width: 640px)').matches ? 13 : 8;
+  document.querySelectorAll('#tbody td.time-cell').forEach(c => {
+    const b = c.getBoundingClientRect(), centre = b.top + b.height / 2 - wrap.getBoundingClientRect().top + wrap.scrollTop;
+    if (Math.abs(centre - y) < reach) c.classList.add('under-tag');
   });
 }
 
@@ -1539,19 +1584,20 @@ function renderTodoList(group) {
   });
   container.appendChild(sortBar);
 
-  // Gather tasks, grouped by burn rate group; open tasks first within each group
-  const ordered = s => {
-    const rows = s.keys.flatMap(k => clientTodos(k).map(t => ({ ...t, _g: k })));
-    return [...sortedTasks(rows.filter(t => !t.done)), ...sortedTasks(rows.filter(t => t.done))];
-  };
-  const blocks = (isAll ? sections : [sec]).map(s => ({ s, rows: ordered(s) })).filter(b => b.rows.length);
+  // Gather tasks. A group tab lists that group's tasks; the All tab lists every task in one flat
+  // list (not split by group), in the chosen order (due date by default). Open tasks come first,
+  // completed ones after them.
+  const gather = secs => secs.flatMap(s => s.keys.flatMap(k => clientTodos(k).map(t => ({ ...t, _g: k }))));
+  const ordered = rows => [...sortedTasks(rows.filter(t => !t.done)), ...sortedTasks(rows.filter(t => t.done))];
+  const allRows = ordered(gather(isAll ? sections : [sec]));
+  const blocks = allRows.length ? [{ rows: allRows }] : [];
 
   if (!blocks.length) {
     const p = document.createElement('p'); p.className = 'todo-empty'; p.textContent = 'No tasks yet.'; container.appendChild(p);
   } else {
     const table = document.createElement('table'); table.className = 'todo-table';
     const colHdr = multi
-      ? `<th style="width:28px"></th><th style="width:90px">Client</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
+      ? `<th style="width:28px"></th><th style="width:90px">${isAll ? 'Group' : 'Client'}</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
       : `<th style="width:28px"></th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`;
     table.innerHTML = `<thead><tr>${colHdr}</tr></thead>`;
     const tBody = document.createElement('tbody');
@@ -1567,7 +1613,7 @@ function renderTodoList(group) {
 
       if (multi) {
         const tdG = document.createElement('td'); tdG.style.cssText = 'font-size:11px; color:#666;';
-        tdG.textContent = g; tr.appendChild(tdG);
+        tdG.textContent = isAll ? sectionForKey(g).label : g; tr.appendChild(tdG);
       }
 
       const tdTask = document.createElement('td'); const inp = document.createElement('input');
@@ -1622,18 +1668,7 @@ function renderTodoList(group) {
       tBody.appendChild(tr);
     };
 
-    blocks.forEach(({ s, rows }) => {
-      if (isAll) {
-        const hdr = document.createElement('tr'); hdr.className = 'todo-group-row';
-        const td = document.createElement('td'); td.colSpan = 8;
-        const open = rows.filter(t => !t.done).length;
-        td.innerHTML = esc(s.label) + (open ? `<span class="pill-count">${open}</span>` : '');
-        td.title = `Open the ${s.label} list`;
-        td.onclick = () => { activeTodoGroup = s.id; renderTodosTab(); };
-        hdr.appendChild(td); tBody.appendChild(hdr);
-      }
-      rows.forEach(addRow);
-    });
+    blocks.forEach(({ rows }) => rows.forEach(addRow));
     table.appendChild(tBody); container.appendChild(table);
   }
 
@@ -2392,6 +2427,7 @@ function showTab(tab) {
   if (tab === 'home') renderHomeTab();
   if (tab === 'todos') renderTodosTab();
   if (tab === 'settings') renderSettings();
+  if (tab === 'tracker') markNow();
   localStorage.setItem('stt_tab', tab);
 }
 
@@ -2416,7 +2452,49 @@ document.getElementById('earlierBtn').addEventListener('click', () => {
 document.getElementById('laterBtn').addEventListener('click', () => {
   const day = getDay(currentDate);
   rangeEnd = Math.min(1440, viewRange(day).hi + 60); rangeSave(); updateRangeDisplay(day); renderBody(day);
+  graveyardGreeting();
 });
+
+// ── Easter egg: first "Later" click of the day ──────────────────
+// A skeleton arm claws out from under a grave: graveyard.gif plays once, then holds its last frame.
+// Each showing gets a fresh blob URL so the GIF always restarts from its first frame; people who
+// prefer reduced motion get the still of the final pose instead.
+const GRAVEYARD_GIF = 'graveyard.gif', GRAVEYARD_STILL = 'graveyard-final-frame.png';
+const graveyardBlobs = {};
+function graveyardBlob(src) {
+  return graveyardBlobs[src] ||= fetch(src).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.blob(); })
+    .catch(e => { delete graveyardBlobs[src]; throw e; });
+}
+const graveyardDue = () => { try { return localStorage.getItem('stt_graveyard') !== todayStr(); } catch { return true; } };
+let graveyardTimer = null, graveyardUrl = null;
+
+async function graveyardGreeting() {
+  if (!graveyardDue()) return;
+  try { localStorage.setItem('stt_graveyard', todayStr()); } catch { /* private mode: just show it */ }
+  const el = document.getElementById('graveyardPop');
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Load the picture first so the animation starts as the pop-up appears; if it can't be loaded
+  // (offline and never cached), show the message on its own.
+  let img = null;
+  try {
+    const blob = await graveyardBlob(still ? GRAVEYARD_STILL : GRAVEYARD_GIF);
+    if (graveyardUrl) URL.revokeObjectURL(graveyardUrl);
+    graveyardUrl = URL.createObjectURL(blob);
+    img = Object.assign(new Image(), { alt: '', className: 'gy-img', src: graveyardUrl });
+    await img.decode();
+  } catch { img = null; }
+  const text = Object.assign(document.createElement('div'), { className: 'gy-text', textContent: 'Working the graveyard shift, huh?' });
+  const x = Object.assign(document.createElement('button'), { className: 'gy-x', textContent: '✕', title: 'Dismiss' });
+  x.setAttribute('aria-label', 'Dismiss');
+  el.replaceChildren(...(img ? [img] : []), text, x);
+  el.hidden = false;
+  const hide = () => { clearTimeout(graveyardTimer); el.classList.remove('show'); setTimeout(() => { if (!el.classList.contains('show')) el.hidden = true; }, 350); };
+  el.onclick = hide;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  clearTimeout(graveyardTimer); graveyardTimer = setTimeout(hide, 7000);
+}
+// Fetch the picture quietly ahead of time (only while today's greeting is still unseen) so it appears instantly
+if (graveyardDue()) setTimeout(() => graveyardBlob(GRAVEYARD_GIF).catch(() => {}), 2500);
 document.getElementById('rangeDisplay').addEventListener('click', () => {
   const day = getDay(currentDate);
   rangeStart = 8 * 60; rangeEnd = 19 * 60; rangeSave(); updateRangeDisplay(day); renderBody(day);
@@ -2452,6 +2530,7 @@ document.addEventListener('visibilitychange', () => {
 // Keep the "now" tag on the minute (not 60s after page load) and fresh after the tab wakes up
 (function tickNow() { markNow(); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') markNow(); });
+window.addEventListener('resize', markNow);
 
 addClientBtn.onclick = openAddClient;
 addClientForm.onsubmit = e => { e.preventDefault(); const name = addClientInp.value.trim(); name ? addClient(name) : closeAddClient(); };

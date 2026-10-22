@@ -121,7 +121,7 @@
 
   /* ── Grid ── */
   #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 80px); background: #fff; }
-  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(120px + var(--cols, 8) * 64px); }
+  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(144px + var(--cols, 8) * 64px); }
 
   thead th {
     position: sticky; top: 0; z-index: 50;
@@ -129,7 +129,7 @@
     padding: 6px 14px 6px 4px; font-size: 11px; line-height: 1.2; border-right: 1px solid #2a4e78;
     text-align: center; vertical-align: bottom;
   }
-  thead th.time-hdr { width: 64px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
+  thead th.time-hdr { width: 88px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
   thead th.total-hdr { width: 56px; padding-right: 4px; }
   .hdr-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
   .rm-btn {
@@ -146,7 +146,7 @@
   tbody.dragging { cursor: cell; user-select: none; }
 
   td { border-right: 1px solid #eef0f3; border-bottom: 1px solid #eef0f3; padding: 0 3px; height: 22px; text-align: center; font-size: 11px; }
-  tbody tr.hour-start td { border-top: 1px solid #d5dbe3; }
+  tbody tr.hour-start td { border-top: 2px solid #9ca7b6; }
   td.time-cell {
     position: sticky; left: 0; z-index: 30; background: inherit;
     text-align: right; padding-right: 8px; color: #b4bcc8; white-space: nowrap; font-variant-numeric: tabular-nums;
@@ -154,6 +154,14 @@
   tr.hour-start td.time-cell { color: #334155; font-weight: bold; }
   tr.now-row td.time-cell { color: #dc2626; font-weight: bold; box-shadow: inset 3px 0 0 #dc2626; }
   tr.now-row td { border-bottom-color: #fca5a5; }
+  /* Arrow tag on the red line showing the current time */
+  tr.now-row td.time-cell { z-index: 31; }
+  tr.now-row td.time-cell::after {
+    content: attr(data-now); position: absolute; left: 3px; bottom: -8px; z-index: 2;
+    height: 14px; line-height: 14px; padding: 0 9px 0 5px; box-sizing: border-box;
+    background: #dc2626; color: #fff; font-size: 9.5px; font-weight: bold; letter-spacing: .01em; pointer-events: none;
+    clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%);
+  }
   td.client-cell { cursor: pointer; position: relative; user-select: none; }
   td.client-cell:hover:not(.sel) { background: #dbeafe; }
   td.client-cell.sel { background: #2563eb; border-bottom-color: #2563eb; border-right-color: #fff; }
@@ -452,9 +460,11 @@
     #tableWrap table { min-width: calc(92px + var(--cols, 8) * 46px); }
     td { padding: 0 1px; height: 30px; }
     td.time-cell { font-size: 10px; padding-right: 5px; }
+    tr.now-row td.time-cell::after { content: attr(data-now-s); left: 2px; font-size: 9px; padding: 0 8px 0 4px; }
     .cell-lbl { display: none; }
     thead th { padding: 5px 2px; font-size: 10px; }
     thead th.time-hdr { width: 50px; padding: 5px 5px; }
+    #tableWrap table { min-width: calc(106px + var(--cols, 8) * 64px); }
     thead th.total-hdr { width: 42px; }
     tfoot td { padding: 4px 2px; font-size: 10px; }
     tfoot td:first-child { padding-right: 5px; }
@@ -1038,7 +1048,14 @@ function decorateCells(day) {
 
 function markNow() {
   const idx = currentDate === todayStr() ? nowSlotIdx() : -1;
-  document.querySelectorAll('#tbody tr[data-time]').forEach(r => r.classList.toggle('now-row', slotIdx(r.dataset.time) === idx));
+  const d = new Date(), mm = pad(d.getMinutes()), h12 = d.getHours() % 12 || 12;
+  document.querySelectorAll('#tbody tr[data-time]').forEach(r => {
+    const isNow = slotIdx(r.dataset.time) === idx;
+    r.classList.toggle('now-row', isNow);
+    const tc = r.querySelector('.time-cell');
+    if (isNow) { tc.dataset.now = `${h12}:${mm} ${d.getHours() < 12 ? 'AM' : 'PM'}`; tc.dataset.nowS = `${h12}:${mm}`; }
+    else { delete tc.dataset.now; delete tc.dataset.nowS; }
+  });
 }
 
 function scrollToNow() {
@@ -2432,7 +2449,9 @@ document.addEventListener('visibilitychange', () => {
   const t = todayStr();
   if (t !== lastSeenToday) { if (currentDate === lastSeenToday) navTo(t); lastSeenToday = t; }
 });
-setInterval(markNow, 60000);
+// Keep the "now" tag on the minute (not 60s after page load) and fresh after the tab wakes up
+(function tickNow() { markNow(); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') markNow(); });
 
 addClientBtn.onclick = openAddClient;
 addClientForm.onsubmit = e => { e.preventDefault(); const name = addClientInp.value.trim(); name ? addClient(name) : closeAddClient(); };

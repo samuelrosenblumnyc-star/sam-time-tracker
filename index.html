@@ -193,6 +193,20 @@
   tfoot td:first-child { text-align: right; padding-right: 8px; left: 0; z-index: 45; }
   tfoot td.zero { color: #c0c7d2; font-weight: normal; }
 
+  /* ── Graveyard-shift easter egg ── */
+  #graveyardPop {
+    position: fixed; left: 50%; top: calc(var(--top-h) + 10px); z-index: 950;
+    transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.2,.9,.3,1.2);
+    display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 24px);
+    background: linear-gradient(180deg, #1e1b3a, #14122b); color: #f3f0ff; padding: 8px 10px 8px 8px; border-radius: 14px;
+    border: 1px solid #3b3566; box-shadow: 0 12px 32px rgba(10, 8, 30, .45);
+  }
+  #graveyardPop.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #graveyardPop svg { width: 84px; height: 63px; flex-shrink: 0; border-radius: 9px; background: #2a2650; }
+  #graveyardPop .gy-text { font-size: 14px; font-weight: bold; line-height: 1.3; }
+  #graveyardPop .gy-x { background: none; border: none; color: #a8a2d6; font-size: 14px; cursor: pointer; padding: 4px 6px; border-radius: 6px; align-self: flex-start; }
+  #graveyardPop .gy-x:hover { color: #fff; background: rgba(255,255,255,.1); }
+
   /* ── Toast ── */
   #toast {
     position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); z-index: 900;
@@ -648,6 +662,7 @@
 <!-- ── Task popover ── -->
 <div id="taskPopover"></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="graveyardPop" role="status" aria-live="polite" hidden></div>
 
 <script>
 // ── Constants ────────────────────────────────────────────────
@@ -2436,7 +2451,55 @@ document.getElementById('earlierBtn').addEventListener('click', () => {
 document.getElementById('laterBtn').addEventListener('click', () => {
   const day = getDay(currentDate);
   rangeEnd = Math.min(1440, viewRange(day).hi + 60); rangeSave(); updateRangeDisplay(day); renderBody(day);
+  graveyardGreeting();
 });
+
+// ── Easter egg: first "Later" click of the day ──────────────────
+// A skeleton arm claws out from under a grave. Drawn as animated SVG (no image download, works offline).
+const GRAVEYARD_SVG = `
+<svg viewBox="0 0 96 72" aria-hidden="true">
+  <circle cx="80" cy="12" r="6" fill="#f6f1c7"/><circle cx="83" cy="10" r="5.2" fill="#2a2650"/>
+  <circle cx="14" cy="9" r="1" fill="#fff" opacity=".8"/><circle cx="46" cy="6" r="1.2" fill="#fff" opacity=".7"/><circle cx="66" cy="22" r=".9" fill="#fff" opacity=".6"/>
+  <rect x="9" y="16" width="26" height="46" rx="13" fill="#9ca3af"/>
+  <rect x="9" y="16" width="26" height="46" rx="13" fill="none" stroke="#6b7280" stroke-width="1.2"/>
+  <text x="22" y="38" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="9" fill="#4b5563">RIP</text>
+  <g transform="translate(62 60)">
+    <g transform="translate(0 56)">
+      <animateTransform attributeName="transform" type="translate" from="0 56" to="0 0" dur="1.2s" begin="0.35s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines=".2 .8 .3 1"/>
+      <g>
+        <animateTransform attributeName="transform" type="rotate" values="0 0 -31;8 0 -31;-6 0 -31;0 0 -31" dur="1.5s" begin="1.7s" repeatCount="indefinite"/>
+        <rect x="-4.2" y="-32" width="3.2" height="32" rx="1.6" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/>
+        <rect x="1" y="-32" width="3.2" height="32" rx="1.6" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/>
+        <ellipse cx="0" cy="-32" rx="6" ry="3" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/>
+        <rect x="-6.5" y="-44" width="13" height="12" rx="4.5" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/>
+        <g transform="rotate(-38 -6 -36)"><rect x="-8.6" y="-45" width="2.8" height="10" rx="1.4" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/></g>
+        <g transform="rotate(-15 -4.6 -43)"><animateTransform attributeName="transform" type="rotate" additive="sum" values="0 -4.6 -43;12 -4.6 -43;0 -4.6 -43" dur=".9s" begin="1.7s" repeatCount="indefinite"/><rect x="-5.9" y="-55" width="2.6" height="12.5" rx="1.3" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/></g>
+        <g transform="rotate(-5 -1.5 -43)"><animateTransform attributeName="transform" type="rotate" additive="sum" values="0 -1.5 -43;-10 -1.5 -43;0 -1.5 -43" dur=".8s" begin="1.8s" repeatCount="indefinite"/><rect x="-2.8" y="-57" width="2.6" height="14.5" rx="1.3" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/></g>
+        <g transform="rotate(5 1.6 -43)"><animateTransform attributeName="transform" type="rotate" additive="sum" values="0 1.6 -43;11 1.6 -43;0 1.6 -43" dur=".85s" begin="1.75s" repeatCount="indefinite"/><rect x="0.3" y="-56" width="2.6" height="13.5" rx="1.3" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/></g>
+        <g transform="rotate(15 4.6 -43)"><animateTransform attributeName="transform" type="rotate" additive="sum" values="0 4.6 -43;-12 4.6 -43;0 4.6 -43" dur=".95s" begin="1.85s" repeatCount="indefinite"/><rect x="3.3" y="-53" width="2.6" height="10.5" rx="1.3" fill="#f3f0e6" stroke="#cfc8b4" stroke-width=".5"/></g>
+      </g>
+    </g>
+  </g>
+  <path d="M40 60 Q62 47 86 60 Z" fill="#5a4332"/>
+  <rect x="0" y="60" width="96" height="12" fill="#4a3728"/>
+  <path d="M0 60 H96" stroke="#3f7a4a" stroke-width="2"/>
+  <path d="M4 60 l1-4 1.5 4 M28 60 l1-3 1.2 3 M88 60 l1-4 1.5 4" stroke="#3f7a4a" stroke-width="1.2" fill="none"/>
+</svg>`;
+
+let graveyardTimer = null;
+function graveyardGreeting() {
+  const today = todayStr();
+  try { if (localStorage.getItem('stt_graveyard') === today) return; localStorage.setItem('stt_graveyard', today); } catch { /* private mode: just show it */ }
+  const el = document.getElementById('graveyardPop');
+  el.innerHTML = `${GRAVEYARD_SVG}<div class="gy-text">Working the graveyard shift, huh?</div><button class="gy-x" aria-label="Dismiss" title="Dismiss">✕</button>`;
+  el.hidden = false;
+  const svg = el.querySelector('svg');
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { svg.setCurrentTime(2); svg.pauseAnimations(); }
+  const hide = () => { clearTimeout(graveyardTimer); el.classList.remove('show'); setTimeout(() => { if (!el.classList.contains('show')) el.hidden = true; }, 350); };
+  el.onclick = hide;
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  clearTimeout(graveyardTimer); graveyardTimer = setTimeout(hide, 7000);
+}
 document.getElementById('rangeDisplay').addEventListener('click', () => {
   const day = getDay(currentDate);
   rangeStart = 8 * 60; rangeEnd = 19 * 60; rangeSave(); updateRangeDisplay(day); renderBody(day);

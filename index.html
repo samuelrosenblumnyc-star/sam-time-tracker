@@ -403,6 +403,9 @@
   .todo-sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #666; }
   .todo-sort-btn { font-size: 11px; padding: 3px 8px; border-radius: 3px; cursor: pointer; border: 1px solid #ddd; background: #fff; font-family: inherit; }
   .todo-sort-btn.active { background: #1b3a5c; color: #fff; border-color: #1b3a5c; }
+  .todo-group-row td { text-align: left; padding: 14px 8px 6px; border-bottom: 2px solid #e5e7eb; font-size: 12px; font-weight: bold; color: #1b3a5c; text-transform: uppercase; letter-spacing: .04em; cursor: pointer; }
+  .todo-group-row:first-child td { padding-top: 4px; }
+  .todo-group-row td:hover { color: #2563eb; }
   .todo-all-group-hdr { font-size: 11px; font-weight: bold; color: #666; text-transform: uppercase; letter-spacing: .04em; padding: 10px 8px 4px; }
 
   /* ── Sync Panel ── */
@@ -1397,23 +1400,47 @@ function allTodoGroups() {
   return [...groups];
 }
 
+// To-dos are stored per client list (e.g. "VGNT", "Hershey") but shown per burn rate group
+// (e.g. "Versigent"), in the order set in Settings. Lists outside every group come after.
+function burnGroupForKey(key) {
+  return config.burnRates.find(r => r.label === key || r.clients.some(c => getTodoGroup(c) === key)) || null;
+}
+function todoSections() {
+  const groups = config.burnRates.map(r => ({ id: 'br:' + r.id, label: r.label, burn: r, keys: [] }));
+  const other = [];
+  allTodoGroups().forEach(k => {
+    const r = burnGroupForKey(k);
+    if (r) groups.find(s => s.burn === r).keys.push(k);
+    else other.push({ id: 'key:' + k, label: k, burn: null, keys: [k] });
+  });
+  return [...groups.filter(s => s.keys.length), ...other];
+}
+function sectionForKey(key) {
+  return todoSections().find(s => s.keys.includes(key)) || { id: 'key:' + key, label: key, burn: null, keys: [key] };
+}
+const isSectionId = id => id === '__all__' || /^(br|key):/.test(id || '');
+const sectionOpenCount = sec => sec.keys.reduce((n, k) => n + clientTodos(k).filter(t => !t.done).length, 0);
+
 function renderTodosTab() {
-  const groups = allTodoGroups();
-  if (!activeTodoGroup || (activeTodoGroup !== '__all__' && !groups.includes(activeTodoGroup))) {
-    activeTodoGroup = groups[0] || null;
+  const sections = todoSections();
+  // Links from Home pass a client list name; open the group that contains it.
+  if (activeTodoGroup && !isSectionId(activeTodoGroup)) activeTodoGroup = sectionForKey(activeTodoGroup).id;
+  if (!activeTodoGroup || (activeTodoGroup !== '__all__' && !sections.some(s => s.id === activeTodoGroup))) {
+    activeTodoGroup = sections[0]?.id || null;
   }
   const pillsEl = document.getElementById('todoClientPills'); pillsEl.innerHTML = '';
-  const openCount = g => clientTodos(g).filter(t => !t.done).length;
   const pillHtml = (label, n) => esc(label) + (n ? `<span class="pill-count">${n}</span>` : '');
   const allBtn = document.createElement('button');
   allBtn.className = 'todo-pill' + (activeTodoGroup === '__all__' ? ' active' : '');
-  allBtn.innerHTML = pillHtml('All Clients', groups.reduce((n, g) => n + openCount(g), 0));
+  allBtn.innerHTML = pillHtml('All', sections.reduce((n, s) => n + sectionOpenCount(s), 0));
   allBtn.onclick = () => { activeTodoGroup = '__all__'; renderTodosTab(); };
   pillsEl.appendChild(allBtn);
-  groups.forEach(g => {
+  sections.forEach(sec => {
     const btn = document.createElement('button');
-    btn.className = 'todo-pill' + (g === activeTodoGroup ? ' active' : '');
-    btn.innerHTML = pillHtml(g, openCount(g)); btn.onclick = () => { activeTodoGroup = g; renderTodosTab(); };
+    btn.className = 'todo-pill' + (sec.id === activeTodoGroup ? ' active' : '');
+    btn.innerHTML = pillHtml(sec.label, sectionOpenCount(sec));
+    btn.title = sec.burn ? `Burn rate group: ${sec.burn.clients.join(', ')}` : sec.label;
+    btn.onclick = () => { activeTodoGroup = sec.id; renderTodosTab(); };
     pillsEl.appendChild(btn);
   });
   if (activeTodoGroup) renderTodoList(activeTodoGroup);
@@ -1423,12 +1450,17 @@ function renderTodoList(group) {
   const isAll = group === '__all__';
   const container = document.getElementById('todoContent'); container.innerHTML = '';
   const today = todayStr();
+  const sections = todoSections();
+  const sec = isAll ? null : sections.find(s => s.id === group);
+  if (!isAll && !sec) return;
+  // Show which client list each task is in whenever more than one list is on screen
+  const multi = isAll || sec.keys.length > 1;
 
   if (!isAll) {
-    const h3 = document.createElement('h3'); h3.textContent = group; container.appendChild(h3);
-    if (group === 'Hershey') {
+    const h3 = document.createElement('h3'); h3.textContent = sec.label; container.appendChild(h3);
+    if (sec.burn) {
       const sub = document.createElement('p'); sub.className = 'todo-subtitle';
-      sub.textContent = "Shared list for: HSY Tier 1/2/3, HSY Dot's, HSY Issues Mgmt, HSY Corp Storytelling, HSY Program MGMT, Reese's";
+      sub.textContent = `Burn rate group · ${sec.burn.clients.join(', ') || 'no clients assigned'}`;
       container.appendChild(sub);
     }
   }
@@ -1445,28 +1477,24 @@ function renderTodoList(group) {
   });
   container.appendChild(sortBar);
 
-  // Gather tasks
-  let rows = [];
-  if (isAll) {
-    allTodoGroups().forEach(g => clientTodos(g).forEach(t => rows.push({ ...t, _g: g })));
-  } else {
-    rows = clientTodos(group).map(t => ({ ...t, _g: group }));
-  }
-  const incomplete = sortedTasks(rows.filter(t => !t.done));
-  const done = sortedTasks(rows.filter(t => t.done));
-  const allRows = [...incomplete, ...done];
+  // Gather tasks, grouped by burn rate group; open tasks first within each group
+  const ordered = s => {
+    const rows = s.keys.flatMap(k => clientTodos(k).map(t => ({ ...t, _g: k })));
+    return [...sortedTasks(rows.filter(t => !t.done)), ...sortedTasks(rows.filter(t => t.done))];
+  };
+  const blocks = (isAll ? sections : [sec]).map(s => ({ s, rows: ordered(s) })).filter(b => b.rows.length);
 
-  if (!allRows.length) {
+  if (!blocks.length) {
     const p = document.createElement('p'); p.className = 'todo-empty'; p.textContent = 'No tasks yet.'; container.appendChild(p);
   } else {
     const table = document.createElement('table'); table.className = 'todo-table';
-    const colHdr = isAll
+    const colHdr = multi
       ? `<th style="width:28px"></th><th style="width:90px">Client</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
       : `<th style="width:28px"></th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`;
     table.innerHTML = `<thead><tr>${colHdr}</tr></thead>`;
     const tBody = document.createElement('tbody');
 
-    allRows.forEach(task => {
+    const addRow = task => {
       const g = task._g;
       const tr = document.createElement('tr'); if (task.done) tr.className = 'done-row';
 
@@ -1475,7 +1503,7 @@ function renderTodoList(group) {
       cb.onchange = () => { toggleDone(g, task.id); renderTodosTab(); renderBody(getDay(currentDate)); };
       tdCb.appendChild(cb); tr.appendChild(tdCb);
 
-      if (isAll) {
+      if (multi) {
         const tdG = document.createElement('td'); tdG.style.cssText = 'font-size:11px; color:#666;';
         tdG.textContent = g; tr.appendChild(tdG);
       }
@@ -1530,6 +1558,19 @@ function renderTodoList(group) {
       };
       tdDel.appendChild(del); tr.appendChild(tdDel);
       tBody.appendChild(tr);
+    };
+
+    blocks.forEach(({ s, rows }) => {
+      if (isAll) {
+        const hdr = document.createElement('tr'); hdr.className = 'todo-group-row';
+        const td = document.createElement('td'); td.colSpan = 8;
+        const open = rows.filter(t => !t.done).length;
+        td.innerHTML = esc(s.label) + (open ? `<span class="pill-count">${open}</span>` : '');
+        td.title = `Open the ${s.label} list`;
+        td.onclick = () => { activeTodoGroup = s.id; renderTodosTab(); };
+        hdr.appendChild(td); tBody.appendChild(hdr);
+      }
+      rows.forEach(addRow);
     });
     table.appendChild(tBody); container.appendChild(table);
   }
@@ -1540,14 +1581,20 @@ function renderTodoList(group) {
     const dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.className = 'add-date-inp';
     const timeInp = document.createElement('input'); timeInp.type = 'time'; timeInp.className = 'add-date-inp';
     const addBtn = document.createElement('button'); addBtn.className = 'add-task-btn'; addBtn.textContent = '+ Add';
+    // A group can span several client lists; pick which one the new task goes in.
+    let listSel = null;
+    if (sec.keys.length > 1) {
+      listSel = document.createElement('select'); listSel.className = 'add-date-inp'; listSel.title = 'Client list';
+      sec.keys.forEach(k => listSel.appendChild(Object.assign(document.createElement('option'), { value: k, textContent: k })));
+    }
     addBtn.onclick = () => {
       const text = taskInp.value.trim(); if (!text) { taskInp.focus(); return; }
-      addTask(group, text, dateInp.value, timeInp.value);
+      addTask(listSel ? listSel.value : sec.keys[0], text, dateInp.value, timeInp.value);
       renderTodosTab(); renderBody(getDay(currentDate));
       document.querySelector('#todoContent .add-task-inp')?.focus();
     };
     taskInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
-    addRow.appendChild(taskInp); addRow.appendChild(dateInp); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
+    addRow.appendChild(taskInp); if (listSel) addRow.appendChild(listSel); addRow.appendChild(dateInp); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
     container.appendChild(addRow);
   }
 }
@@ -1559,9 +1606,11 @@ function renderHomeTab() {
   const cutoffStr = offsetDate(today, 7);
 
   const overdue = [], dueToday = [], highPri = [], upcoming = [];
+  const labelOf = {};
+  todoSections().forEach(s => s.keys.forEach(k => { labelOf[k] = s.label; }));
   allTodoGroups().forEach(g => {
     clientTodos(g).filter(t => !t.done).forEach(t => {
-      const item = { ...t, group: g };
+      const item = { ...t, group: g, groupLabel: labelOf[g] || g };
       if (t.dueDate && t.dueDate < today) overdue.push(item);
       else if (t.dueDate === today) dueToday.push(item);
       else if (t.dueDate && t.dueDate <= cutoffStr) upcoming.push(item);
@@ -1612,7 +1661,7 @@ function makeHomePanel(title, tasks, type, today) {
       const row = document.createElement('div'); row.className = 'home-task-item';
       const cb = document.createElement('input'); cb.type = 'checkbox'; cb.className = 'home-done-cb';
       cb.onchange = () => { toggleDone(t.group, t.id); renderHomeTab(); };
-      const grp = document.createElement('span'); grp.className = 'home-task-group'; grp.textContent = t.group; grp.title = `Open ${t.group} list`;
+      const grp = document.createElement('span'); grp.className = 'home-task-group'; grp.textContent = t.groupLabel; grp.title = `Open ${t.groupLabel} list`;
       grp.onclick = () => { activeTodoGroup = t.group; showTab('todos'); };
       const txt = document.createElement('span'); txt.className = 'home-task-text'; txt.textContent = t.task;
       row.appendChild(cb); row.appendChild(grp); row.appendChild(txt);

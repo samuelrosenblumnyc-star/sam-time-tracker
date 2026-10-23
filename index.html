@@ -131,6 +131,19 @@
   }
   thead th.time-hdr { width: 96px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
   thead th.total-hdr { width: 56px; padding-right: 4px; }
+  /* Drag a client header sideways to reorder the columns */
+  thead th.client-hdr { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  thead th.client-hdr:hover { background: #24507e; }
+  thead th.client-hdr:focus-visible { outline: 2px solid #93c5fd; outline-offset: -2px; }
+  thead th.client-hdr.col-lifted { background: #2a4e78; opacity: .5; }
+  td.col-src { opacity: .4; }
+  body.col-reordering, body.col-reordering * { cursor: grabbing !important; user-select: none !important; }
+  #colGhost {
+    position: fixed; z-index: 1000; pointer-events: none; transform: translateX(-50%) rotate(-1.5deg);
+    background: #2563eb; color: #fff; font-size: 12px; font-weight: bold; padding: 7px 12px; border-radius: 8px;
+    max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 22px rgba(0,0,0,.35);
+  }
+  #colDropBar { position: fixed; z-index: 999; width: 4px; margin-left: -2px; border-radius: 2px; background: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.22); pointer-events: none; }
   .hdr-name { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
   .rm-btn {
     position: absolute; top: 2px; right: 1px; background: none; border: none; color: #fff;
@@ -275,6 +288,17 @@
   .burn-hdr strong { font-size: 13px; font-weight: bold; color: #1b3a5c; }
   .burn-hdr span { font-size: 11px; color: #888; }
   .burn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  /* Drag a burn rate box to reorder; the first ones are the ones you see first */
+  .burn-card { padding: 8px 10px; margin: -8px -10px; border-radius: 8px; cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background .12s; }
+  .burn-card:hover { background: #f3f6fb; }
+  .burn-card:focus-visible { outline: 2px solid #2563eb; outline-offset: 0; }
+  .burn-card.burn-lifted { opacity: .35; }
+  .burn-hint { font-style: normal; font-weight: normal; font-size: 11px; color: #aaa; margin-left: 4px; }
+  .burn-hint i { font-style: normal; }
+  .burn-hint .hint-touch { display: none; }
+  @media (hover: none) { .burn-hint .hint-mouse { display: none; } .burn-hint .hint-touch { display: inline; } }
+  #burnGhost { position: fixed; z-index: 1000; pointer-events: none; transform: translate(-50%, -50%) rotate(-1.5deg); background: #2563eb; color: #fff; font-size: 12px; font-weight: bold; padding: 7px 12px; border-radius: 8px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 8px 22px rgba(0,0,0,.35); }
+  #burnDropBar { position: fixed; z-index: 999; width: 4px; margin-left: -2px; border-radius: 2px; background: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.22); pointer-events: none; }
   .burn-card-label { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
   .burn-card-label span { font-weight: normal; color: #666; font-size: 11px; }
   .burn-card-label span.over { color: #dc2626; font-weight: bold; }
@@ -1003,7 +1027,8 @@ function renderHead(day) {
   const tr = document.createElement('tr');
   const thTime = document.createElement('th'); thTime.className = 'time-hdr'; thTime.textContent = 'Time'; tr.appendChild(thTime);
   day.clients.forEach((c, i) => {
-    const th = document.createElement('th'); th.title = c;
+    const th = document.createElement('th'); th.className = 'client-hdr'; th.tabIndex = 0;
+    th.dataset.i = i; th.title = `${c} — drag to reorder (keyboard: Alt+← / Alt+→)`;
     th.innerHTML = `<span class="hdr-name">${esc(c)}</span><button class="rm-btn" data-i="${i}" title="Remove ${esc(c)} from this day" aria-label="Remove ${esc(c)}">✕</button>`;
     tr.appendChild(th);
   });
@@ -1161,15 +1186,16 @@ function renderBurnRate() {
   const section = document.getElementById('burnSection'); section.innerHTML = '';
   if (!data.length) return;
   const hdr = document.createElement('div'); hdr.className = 'burn-hdr';
-  hdr.innerHTML = `<strong>Monthly Burn Rate</strong><span>${monthName}</span>`; section.appendChild(hdr);
+  hdr.innerHTML = `<strong>Monthly Burn Rate <em class="burn-hint"><i class="hint-mouse">· drag to reorder</i><i class="hint-touch">· press and hold to reorder</i></em></strong><span>${monthName}</span>`; section.appendChild(hdr);
   const grid = document.createElement('div'); grid.className = 'burn-grid';
-  data.forEach(({ label, target, hours }) => {
+  data.forEach(({ label, target, hours }, idx) => {
     const fillPct = Math.min(100, (hours / target) * 100);
     const isOver = hours > target;
     const isWarn = !isOver && (hours / target) - monthPct < -0.15;
     const paceDiff = Math.round((hours - target * monthPct) * 4) / 4;
     const paceTxt = isOver ? 'over target' : Math.abs(paceDiff) < 1 ? 'on pace' : `${fmtHrs(Math.abs(paceDiff))}h ${paceDiff > 0 ? 'ahead of' : 'behind'} pace`;
-    const card = document.createElement('div'); card.className = 'burn-card';
+    const card = document.createElement('div'); card.className = 'burn-card'; card.tabIndex = 0;
+    card.dataset.i = idx; card.dataset.name = label; card.title = `${label} — drag to reorder (keyboard: Alt+← / Alt+→)`;
     const lbl = document.createElement('div'); lbl.className = 'burn-card-label';
     lbl.innerHTML = `<strong>${esc(label)}</strong><span class="${isOver ? 'over' : ''}">${fmtHrs(hours)} / ${target} hrs</span>`;
     const track = document.createElement('div'); track.className = 'burn-track';
@@ -2393,6 +2419,255 @@ function renderSyncPanel() {
 document.getElementById('thead').addEventListener('click', e => {
   const btn = e.target.closest('.rm-btn'); if (btn) removeClient(+btn.dataset.i);
 });
+
+// ── Reorder client columns by dragging their headers ─────────
+// Mouse: drag a header sideways. Touch: press and hold a header, then drag. Keyboard: Alt+← / Alt+→ on a header.
+// The order is saved with the day, and new days start from the most recent day's order.
+function moveColumn(from, to, refocus) {
+  const date = currentDate, day = getDay(date), before = [...day.clients];
+  if (from === to || from < 0 || to < 0 || from >= before.length || to >= before.length) return;
+  const [name] = day.clients.splice(from, 1); day.clients.splice(to, 0, name);
+  dbSave(); renderAll();
+  if (refocus) document.querySelectorAll('#thead th.client-hdr')[to]?.focus();
+  toast(`Moved ${name}`, () => {
+    db[date].clients = before; dbSave();
+    if (currentDate === date) renderAll();
+  });
+}
+
+(function initColumnDrag() {
+  const thead = document.getElementById('thead'), wrap = document.getElementById('tableWrap');
+  let st = null, ghost = null, bar = null, raf = 0;
+  const headers = () => [...thead.querySelectorAll('th.client-hdr')];
+
+  // Which slot among the *other* columns the pointer is over (0 = before the first one)
+  function slotAt(x) { return headers().filter((_, i) => i !== st.from).filter(th => { const r = th.getBoundingClientRect(); return x > r.left + r.width / 2; }).length; }
+
+  function place(x) {
+    st.x = x;
+    const others = headers().filter((_, i) => i !== st.from);
+    st.to = slotAt(x);
+    ghost.style.left = `${x}px`;
+    const top = headers()[0].getBoundingClientRect().top;   // the header cells stay pinned while the grid scrolls; the <thead> box doesn't
+    ghost.style.top = `${top + 4}px`;
+    const edge = st.to < others.length ? others[st.to].getBoundingClientRect().left : others[others.length - 1].getBoundingClientRect().right;
+    bar.style.left = `${edge}px`; bar.style.top = `${top}px`;
+    bar.style.height = `${Math.max(40, Math.min(innerHeight, wrap.getBoundingClientRect().bottom) - top)}px`;
+  }
+
+  function autoScroll() {
+    if (!st || !st.started) return;
+    const wr = wrap.getBoundingClientRect(), timeW = thead.querySelector('.time-hdr').offsetWidth, zone = 56;
+    const l = wr.left + timeW + zone, r = wr.right - zone;
+    let v = 0;
+    if (st.x < l) v = -Math.min(1, (l - st.x) / zone) * 18;
+    else if (st.x > r) v = Math.min(1, (st.x - r) / zone) * 18;
+    if (v) { wrap.scrollLeft += v; place(st.x); }
+    raf = requestAnimationFrame(autoScroll);
+  }
+
+  function begin(x) {
+    st.started = true; hidePopover();
+    const th = headers()[st.from];
+    th.classList.add('col-lifted');
+    document.querySelectorAll(`#tbody td[data-ci="${st.from}"]`).forEach(c => c.classList.add('col-src'));
+    document.body.classList.add('col-reordering');
+    ghost = Object.assign(document.createElement('div'), { id: 'colGhost', textContent: th.querySelector('.hdr-name').textContent });
+    bar = Object.assign(document.createElement('div'), { id: 'colDropBar' });
+    document.body.append(ghost, bar);
+    place(x); raf = requestAnimationFrame(autoScroll);
+  }
+
+  function end(commit) {
+    const s = st; st = null;
+    if (!s) return;
+    clearTimeout(s.timer); cancelAnimationFrame(raf);
+    document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
+    if (!s.started) return;
+    ghost?.remove(); bar?.remove(); ghost = bar = null;
+    document.body.classList.remove('col-reordering');
+    document.querySelectorAll('#thead th.col-lifted').forEach(t => t.classList.remove('col-lifted'));
+    document.querySelectorAll('#tbody td.col-src').forEach(c => c.classList.remove('col-src'));
+    if (commit && s.to !== s.from) moveColumn(s.from, s.to);
+  }
+
+  // Mouse
+  function onMouseMove(e) {
+    if (!st) return;
+    if (!st.started && Math.abs(e.clientX - st.x0) > 5) begin(e.clientX);
+    if (st.started) place(e.clientX);
+  }
+  function onMouseUp() { end(true); }
+  thead.addEventListener('mousedown', e => {
+    const th = e.target.closest('th.client-hdr');
+    if (!th || e.button !== 0 || e.target.closest('.rm-btn')) return;
+    e.preventDefault();
+    st = { from: +th.dataset.i, x0: e.clientX, x: e.clientX, started: false };
+    document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
+  });
+
+  // Touch: a plain swipe still scrolls the grid; press and hold for a moment to pick the column up
+  thead.addEventListener('touchstart', e => {
+    const th = e.target.closest('th.client-hdr');
+    if (!th || e.touches.length !== 1 || e.target.closest('.rm-btn')) return;
+    const t = e.touches[0];
+    st = { from: +th.dataset.i, touch: true, x0: t.clientX, y0: t.clientY, x: t.clientX, started: false };
+    st.timer = setTimeout(() => { if (st && !st.started) { begin(st.x); navigator.vibrate?.(10); } }, 350);
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!st || !st.touch) return;
+    const t = e.touches[0];
+    if (!st.started) {
+      st.x = t.clientX;
+      if (Math.abs(t.clientX - st.x0) + Math.abs(t.clientY - st.y0) > 10) { clearTimeout(st.timer); st = null; }
+      return;
+    }
+    e.preventDefault(); place(t.clientX);
+  }, { passive: false });
+  document.addEventListener('touchend', () => { if (st && st.touch) end(true); });
+  document.addEventListener('touchcancel', () => { if (st && st.touch) end(false); });
+  thead.addEventListener('contextmenu', e => { if (st) e.preventDefault(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && st && st.started) end(false); }, true);
+
+  // Keyboard
+  thead.addEventListener('keydown', e => {
+    const th = e.target.closest('th.client-hdr');
+    if (!th || !e.altKey || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+    e.preventDefault();
+    const i = +th.dataset.i;
+    moveColumn(i, i + (e.key === 'ArrowLeft' ? -1 : 1), true);
+  });
+})();
+
+// ── Reorder the monthly burn rate boxes ──────────────────────
+// Same gestures as the columns: drag with the mouse, press-and-hold on touch, Alt+arrows on the keyboard.
+// The order lives in the burn rate groups list, so Settings and the To-Do tabs follow it too.
+function moveBurn(from, to, refocus) {
+  const list = config.burnRates;
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+  const [g] = list.splice(from, 1); list.splice(to, 0, g);
+  configSave(); renderBurnRate();
+  if (refocus) document.querySelectorAll('#burnSection .burn-card')[to]?.focus();
+  toast(`Moved ${g.label}`, () => {                       // undo: put that same group back where it was
+    const cur = config.burnRates, i = cur.findIndex(x => g.id ? x.id === g.id : x.label === g.label);
+    if (i === -1) return;
+    const [back] = cur.splice(i, 1); cur.splice(Math.min(from, cur.length), 0, back);
+    configSave(); renderBurnRate();
+  });
+}
+
+(function initBurnDrag() {
+  const section = document.getElementById('burnSection');
+  let st = null, ghost = null, bar = null, raf = 0;
+  const cards = () => [...section.querySelectorAll('.burn-card')];
+
+  // Work out where the pointer would drop the card: before or after the nearest other card
+  function target(x, y) {
+    const others = cards().filter((_, i) => i !== st.from);
+    if (!others.length) return null;
+    const rects = others.map(c => c.getBoundingClientRect());
+    const stacked = rects.every(r => Math.abs(r.left - rects[0].left) < 4);   // one column (phones): boxes sit above each other
+    let best = null, bestD = Infinity;
+    rects.forEach((r, k) => {
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      const inside = x >= r.left && x <= r.right && y >= r.top - 7 && y <= r.bottom + 7;
+      const d = inside ? 0 : stacked ? Math.abs(y - cy) : Math.hypot(x - cx, (y - cy) * 2);   // in a grid, favour the same row
+      if (d < bestD) { bestD = d; best = { k, r, after: stacked ? y > cy : x > cx }; }
+    });
+    const r = best.r, to = best.k + (best.after ? 1 : 0);
+    return stacked
+      ? { to, left: r.left, top: best.after ? r.bottom : r.top, width: r.width, height: 4, flat: true }
+      : { to, left: best.after ? r.right : r.left, top: r.top, width: 4, height: r.height };
+  }
+
+  function place(x, y) {
+    st.x = x; st.y = y;
+    ghost.style.left = `${x}px`; ghost.style.top = `${y}px`;
+    const t = target(x, y); if (!t) return;
+    st.to = t.to;
+    bar.style.cssText = t.flat   // horizontal bar between stacked boxes, vertical bar between boxes in a row
+      ? `left:${t.left}px; top:${t.top - 2}px; width:${t.width}px; height:4px; margin:0`
+      : `left:${t.left}px; top:${t.top}px; width:4px; height:${t.height}px`;
+  }
+
+  function autoScroll() {
+    if (!st || !st.started) return;
+    const zone = 70; let v = 0;
+    if (st.y < zone) v = -Math.min(1, (zone - st.y) / zone) * 16;
+    else if (st.y > innerHeight - zone) v = Math.min(1, (st.y - (innerHeight - zone)) / zone) * 16;
+    if (v) { window.scrollBy(0, v); place(st.x, st.y); }
+    raf = requestAnimationFrame(autoScroll);
+  }
+
+  function begin(x, y) {
+    st.started = true; hidePopover();
+    const card = cards()[st.from];
+    card.classList.add('burn-lifted');
+    document.body.classList.add('col-reordering');
+    ghost = Object.assign(document.createElement('div'), { id: 'burnGhost', textContent: card.dataset.name });
+    bar = Object.assign(document.createElement('div'), { id: 'burnDropBar' });
+    document.body.append(ghost, bar);
+    place(x, y); raf = requestAnimationFrame(autoScroll);
+  }
+
+  function end(commit) {
+    const s = st; st = null;
+    if (!s) return;
+    clearTimeout(s.timer); cancelAnimationFrame(raf);
+    document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp);
+    if (!s.started) return;
+    ghost?.remove(); bar?.remove(); ghost = bar = null;
+    document.body.classList.remove('col-reordering');
+    section.querySelectorAll('.burn-lifted').forEach(c => c.classList.remove('burn-lifted'));
+    if (commit && s.to !== undefined && s.to !== s.from) moveBurn(s.from, s.to);
+  }
+
+  function onMouseMove(e) {
+    if (!st) return;
+    if (!st.started && Math.hypot(e.clientX - st.x0, e.clientY - st.y0) > 5) begin(e.clientX, e.clientY);
+    if (st.started) place(e.clientX, e.clientY);
+  }
+  function onMouseUp() { end(true); }
+  section.addEventListener('mousedown', e => {
+    const card = e.target.closest('.burn-card');
+    if (!card || e.button !== 0) return;
+    e.preventDefault();
+    st = { from: +card.dataset.i, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, started: false };
+    document.addEventListener('mousemove', onMouseMove); document.addEventListener('mouseup', onMouseUp);
+  });
+
+  // Touch: a normal swipe still scrolls the page; press and hold to pick a box up
+  section.addEventListener('touchstart', e => {
+    const card = e.target.closest('.burn-card');
+    if (!card || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    st = { from: +card.dataset.i, touch: true, x0: t.clientX, y0: t.clientY, x: t.clientX, y: t.clientY, started: false };
+    st.timer = setTimeout(() => { if (st && !st.started) { begin(st.x, st.y); navigator.vibrate?.(10); } }, 350);
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!st || !st.touch) return;
+    const t = e.touches[0];
+    if (!st.started) {
+      st.x = t.clientX; st.y = t.clientY;
+      if (Math.abs(t.clientX - st.x0) + Math.abs(t.clientY - st.y0) > 10) { clearTimeout(st.timer); st = null; }
+      return;
+    }
+    e.preventDefault(); place(t.clientX, t.clientY);
+  }, { passive: false });
+  document.addEventListener('touchend', () => { if (st && st.touch) end(true); });
+  document.addEventListener('touchcancel', () => { if (st && st.touch) end(false); });
+  section.addEventListener('contextmenu', e => { if (st) e.preventDefault(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && st && st.started) end(false); }, true);
+
+  // Keyboard
+  section.addEventListener('keydown', e => {
+    const card = e.target.closest('.burn-card');
+    if (!card || !e.altKey || !/^Arrow(Left|Right|Up|Down)$/.test(e.key)) return;
+    e.preventDefault();
+    const i = +card.dataset.i;
+    moveBurn(i, i + (e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1), true);
+  });
+})();
 
 document.getElementById('descRows').addEventListener('input', e => {
   const ta = e.target.closest('.desc-textarea'); if (!ta) return;

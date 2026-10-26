@@ -22,7 +22,14 @@
   // claim('name', stamp): true the first time this name is seen with this stamp (a date or a month), false after
   function claim(name, stamp) {
     const k = 'stt_egg_' + name;
-    try { if (localStorage.getItem(k) === stamp) return false; localStorage.setItem(k, stamp); } catch { /* private mode: allow */ }
+    try {
+      // Keep the last few stamps so an egg that fires for two keys on the same day (or an older plain-string value) can't repeat.
+      const raw = localStorage.getItem(k);
+      let seen = [];
+      try { const v = JSON.parse(raw); seen = Array.isArray(v) ? v : raw ? [raw] : []; } catch { seen = raw ? [raw] : []; }
+      if (seen.includes(stamp)) return false;
+      localStorage.setItem(k, JSON.stringify([...seen, stamp].slice(-8)));
+    } catch { /* private mode: allow */ }
     return true;
   }
   const todayStamp = () => todayStr();
@@ -63,7 +70,8 @@
 
   /* Konami: retro mode */
   html.egg-retro body, html.egg-retro button, html.egg-retro input, html.egg-retro select, html.egg-retro textarea { font-family: "Courier New", Courier, monospace !important; }
-  html.egg-retro body { background: #05060a; filter: contrast(1.18) saturate(1.9) hue-rotate(-12deg); image-rendering: pixelated; }
+  html.egg-retro { filter: contrast(1.18) saturate(1.9) hue-rotate(-12deg); }
+  html.egg-retro body { background: #05060a; image-rendering: pixelated; }
   html.egg-retro #topbar, html.egg-retro thead th, html.egg-retro tfoot td { background: #000 !important; color: #39ff14 !important; border-color: #14532d !important; text-shadow: 0 0 6px #39ff14; }
   html.egg-retro td { border-color: #12331f !important; }
   html.egg-retro td.client-cell.sel { background: #ff2bd6 !important; border-color: #ff2bd6 !important; box-shadow: 0 0 8px #ff2bd6; }

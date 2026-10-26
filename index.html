@@ -172,13 +172,17 @@
   /* No z-index here on purpose: the line runs over the grid but behind the sticky time column, so the gray times always stay
      readable; only the tag (z-index below) sits on top of that column. */
   #nowLine { position: absolute; left: 0; top: 0; height: 0; border-top: 2px solid #dc2626; pointer-events: none; display: none; }
+  /* The tag's red arrow is drawn by ::before (clipped to the arrow shape); ::after is a short red stem from the arrow tip
+     across the sticky time column, so the line visibly starts at the arrow instead of leaving a gap. */
   #nowTag {
     display: block; position: sticky; left: 3px; z-index: 36; width: max-content; margin-top: -8px;
-    height: 14px; line-height: 14px; padding: 0 9px 0 5px; box-sizing: border-box;
-    background: #dc2626; color: #fff; font-size: 9.5px; font-weight: bold; letter-spacing: .01em;
+    height: 14px; line-height: 14px; box-sizing: border-box; color: #fff; font-size: 9.5px; font-weight: bold; letter-spacing: .01em;
+  }
+  #nowTag::before {
+    content: attr(data-full); display: block; height: 14px; padding: 0 9px 0 5px; background: #dc2626;
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%);
   }
-  #nowTag::before { content: attr(data-full); }
+  #nowTag::after { content: ''; position: absolute; left: calc(100% - 1px); top: 6px; width: 120px; height: 2px; background: #dc2626; }
   td.client-cell { cursor: pointer; position: relative; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   td.client-cell.touch-held { outline: 2px solid #2563eb; outline-offset: -2px; background: #dbeafe; }
   td.client-cell:hover:not(.sel) { background: #dbeafe; }
@@ -509,8 +513,8 @@
     #tableWrap table { min-width: calc(92px + var(--cols, 8) * 46px); }
     td { padding: 0 1px; height: 30px; }
     td.time-cell { font-size: 10px; padding-right: 5px; }
-    #nowTag { left: 2px; font-size: 8.5px; padding: 0 7px 0 4px; }
-    #nowTag::before { content: attr(data-short); }
+    #nowTag { left: 2px; font-size: 8.5px; }
+    #nowTag::before { content: attr(data-short); padding: 0 7px 0 4px; }
     .cell-lbl { display: none; }
     thead th { padding: 5px 2px; font-size: 10px; }
     thead th.time-hdr { width: 72px; padding: 5px 5px; }

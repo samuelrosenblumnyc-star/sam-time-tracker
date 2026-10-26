@@ -5,6 +5,11 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
+- **2026-10-26: The red line now starts at the arrow.** The time tag's arrow ended inside the time column while the line only began at the column's edge, leaving a gap. A short red stem now runs from the arrow tip across the time column, so the line looks continuous from the arrow onward (desktop and phone).
+
+## Published
+
+### 2026-10-26: PR #6
 - **2026-10-26: Fixed two bugs from the easter eggs update.**
   - *The red "now" line could end up in the wrong place after retro mode.* Retro mode changes the grid's fonts and row heights, and the line was only re-placed once a minute, so it stayed at an out-of-date position (about 8 minutes off on one screen) until the next tick. The line now re-places itself whenever the grid changes size (retro mode on or off, fonts loading, rows resizing), so it can't go stale.
   - *The Halloween pumpkin covered the Total number.* There is now just one small pumpkin, tucked into the very bottom-left corner (the empty part of the time column), and the cobwebs are smaller and fainter. Checked on several screen sizes (including 1919x910 and two phone sizes), at the normal position and with the page scrolled to the bottom: it never touches any text.
@@ -19,8 +24,6 @@ Every edit requested for the time tracker, newest first.
   - *Failed saves* (storage full or blocked) now show a message instead of silently losing the edit.
   - *Easter eggs* can no longer repeat on the same day when two triggers share an egg; retro mode no longer shifts pop-ups when the page is scrolled.
   - Added a favicon (the browser was requesting one and getting an error).
-
-## Published
 
 ### 2026-10-26: PR #5
 - **Easter eggs and seasonal decorations** (new `easter-eggs.js`; if it ever fails to load, the app works as before). Each shows at most once per day or month, is dismissible, never blocks a tap or scroll, shows a still picture when reduced motion is on, and is not part of the synced data. At most two pop-ups show at once; the rest wait their turn.

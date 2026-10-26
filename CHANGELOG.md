@@ -5,7 +5,7 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-(nothing right now)
+- **2026-10-26: The red line now starts at the arrow.** The time tag's arrow ended inside the time column while the line only began at the column's edge, leaving a gap. A short red stem now runs from the arrow tip across the time column, so the line looks continuous from the arrow onward (desktop and phone).
 
 ## Published
 

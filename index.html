@@ -121,7 +121,7 @@
 
   /* ── Grid ── */
   #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 80px); background: #fff; }
-  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(152px + var(--cols, 8) * 64px); }
+  #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(160px + var(--cols, 8) * 64px); }
 
   thead th {
     position: sticky; top: 0; z-index: 50;
@@ -129,7 +129,7 @@
     padding: 6px 14px 6px 4px; font-size: 11px; line-height: 1.2; border-right: 1px solid #2a4e78;
     text-align: center; vertical-align: bottom;
   }
-  thead th.time-hdr { width: 96px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
+  thead th.time-hdr { width: 104px; text-align: right; padding: 6px 8px; left: 0; z-index: 60; }
   thead th.total-hdr { width: 56px; padding-right: 4px; }
   /* Drag a client header sideways to reorder the columns */
   thead th.client-hdr { cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
@@ -165,19 +165,21 @@
     text-align: right; padding-right: 8px; color: #b4bcc8; white-space: nowrap; font-variant-numeric: tabular-nums;
   }
   tr.hour-start td.time-cell { color: #334155; font-weight: bold; }
-  tr.now-row td.time-cell { color: #dc2626; font-weight: bold; box-shadow: inset 3px 0 0 #dc2626; }
+  tr.now-row td.time-cell { box-shadow: inset 3px 0 0 #dc2626; }   /* the time label itself keeps its normal gray; only a thin red marker flags the current row */
   /* Red "now" line: moves down through the slot minute by minute, like a clock hand */
   #tableWrap { position: relative; }
-  #nowLine { position: absolute; left: 0; top: 0; height: 0; border-top: 2px solid #dc2626; z-index: 35; pointer-events: none; display: none; }
+  /* No z-index here on purpose: the line runs over the grid but behind the sticky time column, so the gray times always stay
+     readable; only the tag (z-index below) sits on top of that column. */
+  #nowLine { position: absolute; left: 0; top: 0; height: 0; border-top: 2px solid #dc2626; pointer-events: none; display: none; }
   #nowTag {
-    display: block; position: sticky; left: 3px; width: max-content; margin-top: -8px;
+    display: block; position: sticky; left: 3px; z-index: 36; width: max-content; margin-top: -8px;
     height: 14px; line-height: 14px; padding: 0 9px 0 5px; box-sizing: border-box;
     background: #dc2626; color: #fff; font-size: 9.5px; font-weight: bold; letter-spacing: .01em;
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%);
   }
   #nowTag::before { content: attr(data-full); }
-  td.time-cell.under-tag { color: transparent !important; }  /* a time label the line is passing through */
-  td.client-cell { cursor: pointer; position: relative; user-select: none; }
+  td.client-cell { cursor: pointer; position: relative; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  td.client-cell.touch-held { outline: 2px solid #2563eb; outline-offset: -2px; background: #dbeafe; }
   td.client-cell:hover:not(.sel) { background: #dbeafe; }
   td.client-cell.sel { background: #2563eb; border-bottom-color: #2563eb; border-right-color: #fff; }
   td.client-cell.sel.no-task { background: #93b4f5; border-bottom-color: #93b4f5; }
@@ -207,14 +209,19 @@
   tfoot td.zero { color: #c0c7d2; font-weight: normal; }
 
   /* ── Graveyard-shift easter egg ── */
+  /* All the pop-ups (this one and the other easter eggs) stack here, under the header */
+  #eggStack {
+    position: fixed; left: 50%; top: calc(var(--top-h) + 10px); transform: translateX(-50%); z-index: 950;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 24px); pointer-events: none;
+  }
+  #graveyardPop[hidden] { display: none; }
   #graveyardPop {
-    position: fixed; left: 50%; top: calc(var(--top-h) + 10px); z-index: 950;
-    transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.2,.9,.3,1.2);
+    transform: translateY(-24px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.2,.9,.3,1.2);
     display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 24px);
     background: linear-gradient(180deg, #1e1b3a, #14122b); color: #f3f0ff; padding: 8px 10px 8px 8px; border-radius: 14px;
     border: 1px solid #3b3566; box-shadow: 0 12px 32px rgba(10, 8, 30, .45);
   }
-  #graveyardPop.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #graveyardPop.show { opacity: 1; transform: none; pointer-events: auto; }
   #graveyardPop .gy-img { display: block; width: 120px; height: 90px; flex-shrink: 0; border-radius: 9px; background: #2a2650; }
   #graveyardPop .gy-text { font-size: 14px; font-weight: bold; line-height: 1.3; }
   #graveyardPop .gy-x { background: none; border: none; color: #a8a2d6; font-size: 14px; cursor: pointer; padding: 4px 6px; border-radius: 6px; align-self: flex-start; }
@@ -501,12 +508,12 @@
     #tableWrap table { min-width: calc(92px + var(--cols, 8) * 46px); }
     td { padding: 0 1px; height: 30px; }
     td.time-cell { font-size: 10px; padding-right: 5px; }
-    #nowTag { left: 2px; font-size: 9px; padding: 0 8px 0 4px; }
+    #nowTag { left: 2px; font-size: 8.5px; padding: 0 7px 0 4px; }
     #nowTag::before { content: attr(data-short); }
     .cell-lbl { display: none; }
     thead th { padding: 5px 2px; font-size: 10px; }
-    thead th.time-hdr { width: 50px; padding: 5px 5px; }
-    #tableWrap table { min-width: calc(106px + var(--cols, 8) * 64px); }
+    thead th.time-hdr { width: 72px; padding: 5px 5px; }
+    #tableWrap table { min-width: calc(128px + var(--cols, 8) * 64px); }
     thead th.total-hdr { width: 42px; }
     tfoot td { padding: 4px 2px; font-size: 10px; }
     tfoot td:first-child { padding-right: 5px; }
@@ -680,6 +687,9 @@
       <!-- Panel 3: Cross-Device Sync -->
       <div id="syncPanel"></div>
 
+      <!-- Panel 4: Fun stuff (easter eggs + seasonal decorations; set up by easter-eggs.js) -->
+      <div class="settings-panel" id="funPanel" hidden></div>
+
     </div>
   </div>
 </div>
@@ -687,7 +697,7 @@
 <!-- ── Task popover ── -->
 <div id="taskPopover"></div>
 <div id="toast" role="status" aria-live="polite"></div>
-<div id="graveyardPop" role="status" aria-live="polite" hidden></div>
+<div id="eggStack"><div id="graveyardPop" role="status" aria-live="polite" hidden></div></div>
 
 <script>
 // ── Constants ────────────────────────────────────────────────
@@ -866,7 +876,15 @@ function deleteTask(group, taskId) {
   Object.values(db).forEach(day => Object.keys(day.blocks).forEach(t => { if (bTaskId(day.blocks[t]) === taskId) day.blocks[t].taskId = '__other__'; }));
   todosSave(); dbSave();
 }
-function toggleDone(group, taskId) { const t = findTask(group, taskId); if (t) { t.done = !t.done; todosSave(); } }
+function overdueOpenCount() {
+  const today = todayStr(); let n = 0;
+  allTodoGroups().forEach(g => clientTodos(g).forEach(t => { if (!t.done && t.dueDate && t.dueDate < today) n++; }));
+  return n;
+}
+function toggleDone(group, taskId) {
+  const t = findTask(group, taskId);
+  if (t) { const was = overdueOpenCount(); t.done = !t.done; todosSave(); eggHook('todoToggle', { was, now: overdueOpenCount() }); }
+}
 function updateTaskField(group, taskId, field, val) { const t = findTask(group, taskId); if (t) { t[field] = val; todosSave(); } }
 
 // ── App State ────────────────────────────────────────────────
@@ -1021,6 +1039,7 @@ function renderAll() {
   renderBurnRate();
   updateTotalDisplay(day);
   updateDayInfo();
+  eggHook('render');
 }
 
 function renderHead(day) {
@@ -1107,7 +1126,6 @@ function markNow() {
 
 function placeNowLine(row) {
   const wrap = document.getElementById('tableWrap'), line = document.getElementById('nowLine'), tag = document.getElementById('nowTag');
-  document.querySelectorAll('td.time-cell.under-tag').forEach(c => c.classList.remove('under-tag'));
   const rowBox = row && row.getBoundingClientRect();
   if (!row || !rowBox.height) { line.style.display = 'none'; return; }  // not today, outside the shown hours, or tab hidden
   const d = new Date();
@@ -1119,13 +1137,6 @@ function placeNowLine(row) {
   const h12 = d.getHours() % 12 || 12, mm = pad(d.getMinutes());
   tag.dataset.full = `${h12}:${mm} ${d.getHours() < 12 ? 'AM' : 'PM'}`;
   tag.dataset.short = `${h12}:${mm}`;
-  // Hide the time label the line is crossing so it isn't struck through (wider margin on phones,
-  // where the tag also covers part of the column)
-  const reach = window.matchMedia('(max-width: 640px)').matches ? 13 : 8;
-  document.querySelectorAll('#tbody td.time-cell').forEach(c => {
-    const b = c.getBoundingClientRect(), centre = b.top + b.height / 2 - wrap.getBoundingClientRect().top + wrap.scrollTop;
-    if (Math.abs(centre - y) < reach) c.classList.add('under-tag');
-  });
 }
 
 function scrollToNow() {
@@ -1207,6 +1218,7 @@ function renderBurnRate() {
     card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl); grid.appendChild(card);
   });
   section.appendChild(grid);
+  eggHook('burn');
 }
 
 // ── Targeted updates ─────────────────────────────────────────
@@ -1228,9 +1240,13 @@ function updateDayInfo() {
   document.getElementById('dayInfo').textContent = n > 0 ? `${n} day${n !== 1 ? 's' : ''} with entries` : '';
 }
 
+// Optional easter eggs (easter-eggs.js) listen for these events. If that file is missing or breaks, the app works the same.
+function eggHook(name, data) { try { window.EGGS?.[name]?.(data); } catch (e) { console.warn('easter egg:', name, e); } }
+
 function afterBlockChange(day) {
   autoFillDescs(day); dbSave();
   refreshCells(day); updateTotalDisplay(day); renderDescs(day); renderBurnRate();
+  eggHook('logged');
 }
 
 // ── Task Popover ─────────────────────────────────────────────
@@ -1407,6 +1423,7 @@ function endDrag() {
     autoFillDescs(day); dbSave();
     refreshCells(day); renderDescs(day); renderBurnRate();
   }
+  eggHook('logged');
 }
 
 tbody.addEventListener('mousedown', e => {
@@ -1429,31 +1446,82 @@ tbody.addEventListener('mouseover', e => {
 
 document.addEventListener('mouseup', endDrag);
 
-// Touch drag-to-fill (mirrors mouse logic above)
+// Touch: a tap logs the slot / opens the task menu, a swipe scrolls the grid as normal, and pressing
+// and holding for a moment before dragging fills a range. (The browser's scrolling is only blocked once a
+// hold has started, so swipes that begin on a cell are never turned into painted time.)
+let touchPress = null;   // { cell, x, y, held, timer, raf }
+
+function touchPaintAt(x, y) {
+  const cell = document.elementFromPoint(x, y)?.closest('.client-cell');
+  if (cell && drag && +cell.dataset.ci === drag.ci) {
+    const day = getDay(currentDate);
+    paintCell(cell, cell.dataset.time, day);
+    renderFoot(day); updateTotalDisplay(day);
+  }
+}
+
+// While a fill is in progress, holding the finger near the top or bottom of the visible time rows scrolls the
+// grid (measured between the sticky header and the sticky Sums row, which sit over the edges)
+function touchEdgeScroll() {
+  if (!touchPress || !touchPress.held) return;
+  const wrap = document.getElementById('tableWrap'), zone = 40;
+  const top = document.querySelector('#thead th').getBoundingClientRect().bottom;
+  const bottom = document.querySelector('#tfoot td')?.getBoundingClientRect().top ?? wrap.getBoundingClientRect().bottom;
+  let v = 0;
+  if (touchPress.y < top + zone) v = -Math.min(1, (top + zone - touchPress.y) / zone) * 12;
+  else if (touchPress.y > bottom - zone) v = Math.min(1, (touchPress.y - (bottom - zone)) / zone) * 12;
+  if (v && drag && drag.moved) { wrap.scrollTop += v; touchPaintAt(touchPress.x, Math.min(Math.max(touchPress.y, top + 2), bottom - 2)); }
+  touchPress.raf = requestAnimationFrame(touchEdgeScroll);
+}
+
+function touchPressEnd(commit) {
+  const tp = touchPress; touchPress = null;
+  if (!tp) return null;
+  clearTimeout(tp.timer); cancelAnimationFrame(tp.raf);
+  tp.cell.classList.remove('touch-held');
+  if (!commit) { if (drag) endDrag(); return tp; }
+  return tp;
+}
+
 tbody.addEventListener('touchstart', e => {
   const cell = e.target.closest('.client-cell');
-  if (!cell) return;
-  e.preventDefault();
-  startDrag(cell, e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
+  if (!cell || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  touchPress = { cell, x: t.clientX, y: t.clientY, held: false };
+  touchPress.timer = setTimeout(() => {
+    if (!touchPress) return;
+    touchPress.held = true; cell.classList.add('touch-held'); navigator.vibrate?.(10);
+    touchPress.raf = requestAnimationFrame(touchEdgeScroll);
+  }, 320);
+}, { passive: true });
 
 document.addEventListener('touchmove', e => {
-  if (!drag) return;
-  const touch = e.touches[0];
-  beginDragIfMoved(touch.clientX, touch.clientY, 8);
-  if (drag.moved) {
-    e.preventDefault();
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const cell = el?.closest('.client-cell');
-    if (cell && +cell.dataset.ci === drag.ci) {
-      const day = getDay(currentDate);
-      paintCell(cell, cell.dataset.time, day);
-      renderFoot(day); updateTotalDisplay(day);
-    }
+  if (!touchPress) return;
+  const t = e.touches[0];
+  if (!touchPress.held) {
+    // moved before the hold registered: it's a scroll, so leave it to the browser
+    if (Math.abs(t.clientX - touchPress.x) + Math.abs(t.clientY - touchPress.y) > 8) touchPressEnd(true);
+    return;
   }
+  e.preventDefault();
+  touchPress.x = t.clientX; touchPress.y = t.clientY;
+  if (!drag) {                                   // first movement after the hold: start filling from the pressed slot
+    startDrag(touchPress.cell, touchPress.x0 ?? t.clientX, touchPress.y0 ?? t.clientY);
+    beginDragIfMoved(t.clientX, t.clientY, -1);
+    touchPress.cell.classList.remove('touch-held');
+  }
+  touchPaintAt(t.clientX, t.clientY);
 }, { passive: false });
 
-document.addEventListener('touchend', endDrag);
+document.addEventListener('touchend', e => {
+  const tp = touchPressEnd(true);
+  if (!tp) return;
+  if (e.cancelable) e.preventDefault();          // we handled it: no emulated mouse events or click afterwards
+  if (drag) { endDrag(); return; }               // finished a hold-and-drag fill
+  startDrag(tp.cell, tp.x, tp.y); endDrag();     // a tap (or a hold released without moving): log the slot and open the menu
+}, { passive: false });
+document.addEventListener('touchcancel', () => { touchPressEnd(false); });
+tbody.addEventListener('contextmenu', e => { if (touchPress) e.preventDefault(); });
 
 function paintCell(cell, time, day) {
   setBlock(day, time, drag.client, drag.taskId, drag.otherText || '');
@@ -2744,7 +2812,7 @@ const graveyardDue = () => { try { return localStorage.getItem('stt_graveyard') 
 let graveyardTimer = null, graveyardUrl = null;
 
 async function graveyardGreeting() {
-  if (!graveyardDue()) return;
+  if (!graveyardDue() || (window.EGGS && !window.EGGS.enabled())) return;
   try { localStorage.setItem('stt_graveyard', todayStr()); } catch { /* private mode: just show it */ }
   const el = document.getElementById('graveyardPop');
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2803,8 +2871,8 @@ document.addEventListener('visibilitychange', () => {
   if (t !== lastSeenToday) { if (currentDate === lastSeenToday) navTo(t); lastSeenToday = t; }
 });
 // Keep the "now" tag on the minute (not 60s after page load) and fresh after the tab wakes up
-(function tickNow() { markNow(); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') markNow(); });
+(function tickNow() { markNow(); eggHook('tick'); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { markNow(); eggHook('tick'); } });
 window.addEventListener('resize', markNow);
 
 addClientBtn.onclick = openAddClient;
@@ -2898,15 +2966,17 @@ const QUOTES = [
 let quoteIdx = Math.floor(Math.random() * QUOTES.length);
 const quoteEl = document.getElementById('quoteDisplay');
 
+const activeQuotes = () => window.EGGS?.quotes?.() || QUOTES;   // the easter eggs can swap the list for a day
 function showNextQuote(immediate) {
   if (immediate) {
-    quoteEl.textContent = QUOTES[quoteIdx];
+    const q = activeQuotes(); quoteEl.textContent = q[quoteIdx % q.length];
     return;
   }
   quoteEl.classList.add('fade');
   setTimeout(() => {
-    quoteIdx = (quoteIdx + 1) % QUOTES.length;
-    quoteEl.textContent = QUOTES[quoteIdx];
+    const q = activeQuotes();
+    quoteIdx = (quoteIdx + 1) % q.length;
+    quoteEl.textContent = q[quoteIdx];
     quoteEl.classList.remove('fade');
   }, 650);
 }
@@ -2923,6 +2993,7 @@ scrollToNow();
 syncBooted = true;
 autoSync();
 </script>
+<script src="easter-eggs.js" defer></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));

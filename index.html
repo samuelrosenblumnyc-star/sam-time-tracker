@@ -178,7 +178,8 @@
     clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 0 100%);
   }
   #nowTag::before { content: attr(data-full); }
-  td.client-cell { cursor: pointer; position: relative; user-select: none; }
+  td.client-cell { cursor: pointer; position: relative; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  td.client-cell.touch-held { outline: 2px solid #2563eb; outline-offset: -2px; background: #dbeafe; }
   td.client-cell:hover:not(.sel) { background: #dbeafe; }
   td.client-cell.sel { background: #2563eb; border-bottom-color: #2563eb; border-right-color: #fff; }
   td.client-cell.sel.no-task { background: #93b4f5; border-bottom-color: #93b4f5; }
@@ -1422,31 +1423,82 @@ tbody.addEventListener('mouseover', e => {
 
 document.addEventListener('mouseup', endDrag);
 
-// Touch drag-to-fill (mirrors mouse logic above)
+// Touch: a tap logs the slot / opens the task menu, a swipe scrolls the grid as normal, and pressing
+// and holding for a moment before dragging fills a range. (The browser's scrolling is only blocked once a
+// hold has started, so swipes that begin on a cell are never turned into painted time.)
+let touchPress = null;   // { cell, x, y, held, timer, raf }
+
+function touchPaintAt(x, y) {
+  const cell = document.elementFromPoint(x, y)?.closest('.client-cell');
+  if (cell && drag && +cell.dataset.ci === drag.ci) {
+    const day = getDay(currentDate);
+    paintCell(cell, cell.dataset.time, day);
+    renderFoot(day); updateTotalDisplay(day);
+  }
+}
+
+// While a fill is in progress, holding the finger near the top or bottom of the visible time rows scrolls the
+// grid (measured between the sticky header and the sticky Sums row, which sit over the edges)
+function touchEdgeScroll() {
+  if (!touchPress || !touchPress.held) return;
+  const wrap = document.getElementById('tableWrap'), zone = 40;
+  const top = document.querySelector('#thead th').getBoundingClientRect().bottom;
+  const bottom = document.querySelector('#tfoot td')?.getBoundingClientRect().top ?? wrap.getBoundingClientRect().bottom;
+  let v = 0;
+  if (touchPress.y < top + zone) v = -Math.min(1, (top + zone - touchPress.y) / zone) * 12;
+  else if (touchPress.y > bottom - zone) v = Math.min(1, (touchPress.y - (bottom - zone)) / zone) * 12;
+  if (v && drag && drag.moved) { wrap.scrollTop += v; touchPaintAt(touchPress.x, Math.min(Math.max(touchPress.y, top + 2), bottom - 2)); }
+  touchPress.raf = requestAnimationFrame(touchEdgeScroll);
+}
+
+function touchPressEnd(commit) {
+  const tp = touchPress; touchPress = null;
+  if (!tp) return null;
+  clearTimeout(tp.timer); cancelAnimationFrame(tp.raf);
+  tp.cell.classList.remove('touch-held');
+  if (!commit) { if (drag) endDrag(); return tp; }
+  return tp;
+}
+
 tbody.addEventListener('touchstart', e => {
   const cell = e.target.closest('.client-cell');
-  if (!cell) return;
-  e.preventDefault();
-  startDrag(cell, e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
+  if (!cell || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  touchPress = { cell, x: t.clientX, y: t.clientY, held: false };
+  touchPress.timer = setTimeout(() => {
+    if (!touchPress) return;
+    touchPress.held = true; cell.classList.add('touch-held'); navigator.vibrate?.(10);
+    touchPress.raf = requestAnimationFrame(touchEdgeScroll);
+  }, 320);
+}, { passive: true });
 
 document.addEventListener('touchmove', e => {
-  if (!drag) return;
-  const touch = e.touches[0];
-  beginDragIfMoved(touch.clientX, touch.clientY, 8);
-  if (drag.moved) {
-    e.preventDefault();
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const cell = el?.closest('.client-cell');
-    if (cell && +cell.dataset.ci === drag.ci) {
-      const day = getDay(currentDate);
-      paintCell(cell, cell.dataset.time, day);
-      renderFoot(day); updateTotalDisplay(day);
-    }
+  if (!touchPress) return;
+  const t = e.touches[0];
+  if (!touchPress.held) {
+    // moved before the hold registered: it's a scroll, so leave it to the browser
+    if (Math.abs(t.clientX - touchPress.x) + Math.abs(t.clientY - touchPress.y) > 8) touchPressEnd(true);
+    return;
   }
+  e.preventDefault();
+  touchPress.x = t.clientX; touchPress.y = t.clientY;
+  if (!drag) {                                   // first movement after the hold: start filling from the pressed slot
+    startDrag(touchPress.cell, touchPress.x0 ?? t.clientX, touchPress.y0 ?? t.clientY);
+    beginDragIfMoved(t.clientX, t.clientY, -1);
+    touchPress.cell.classList.remove('touch-held');
+  }
+  touchPaintAt(t.clientX, t.clientY);
 }, { passive: false });
 
-document.addEventListener('touchend', endDrag);
+document.addEventListener('touchend', e => {
+  const tp = touchPressEnd(true);
+  if (!tp) return;
+  if (e.cancelable) e.preventDefault();          // we handled it: no emulated mouse events or click afterwards
+  if (drag) { endDrag(); return; }               // finished a hold-and-drag fill
+  startDrag(tp.cell, tp.x, tp.y); endDrag();     // a tap (or a hold released without moving): log the slot and open the menu
+}, { passive: false });
+document.addEventListener('touchcancel', () => { touchPressEnd(false); });
+tbody.addEventListener('contextmenu', e => { if (touchPress) e.preventDefault(); });
 
 function paintCell(cell, time, day) {
   setBlock(day, time, drag.client, drag.taskId, drag.otherText || '');

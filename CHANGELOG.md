@@ -5,7 +5,20 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-_Nothing right now. Everything requested so far is live._
+- **2026-10-26: Fixed two bugs from the easter eggs update.**
+  - *The red "now" line could end up in the wrong place after retro mode.* Retro mode changes the grid's fonts and row heights, and the line was only re-placed once a minute, so it stayed at an out-of-date position (about 8 minutes off on one screen) until the next tick. The line now re-places itself whenever the grid changes size (retro mode on or off, fonts loading, rows resizing), so it can't go stale.
+  - *The Halloween pumpkin covered the Total number.* There is now just one small pumpkin, tucked into the very bottom-left corner (the empty part of the time column), and the cobwebs are smaller and fainter. Checked on several screen sizes (including 1919x910 and two phone sizes), at the normal position and with the page scrolled to the bottom: it never touches any text.
+
+- **2026-10-26: Bug sweep.** Went through the whole app looking for problems and fixed these:
+  - *Damaged or odd saved data could crash the app* (e.g. from an old version, a hand-edited Gist, or a sync mix-up). Saved and synced data is now checked and repaired when loaded, so the app always starts.
+  - *A new day copied the client list from the latest day on record* (even one in the future) instead of the nearest earlier day. It now copies the nearest earlier day.
+  - *Client names that differ only by capital letters* (e.g. "Zeta" and "zeta") could be added twice. They are now treated as the same.
+  - *Dragging the column header when only one client is on the day* caused an error. It now does nothing.
+  - *Reordering columns* now also reorders later empty days that have the same clients, so tomorrow matches.
+  - *Phone To-Do tab* was wider than the screen (the Task column was squashed). The list now scrolls sideways inside its box.
+  - *Failed saves* (storage full or blocked) now show a message instead of silently losing the edit.
+  - *Easter eggs* can no longer repeat on the same day when two triggers share an egg; retro mode no longer shifts pop-ups when the page is scrolled.
+  - Added a favicon (the browser was requesting one and getting an error).
 
 ## Published
 

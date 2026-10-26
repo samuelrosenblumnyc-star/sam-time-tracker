@@ -22,7 +22,14 @@
   // claim('name', stamp): true the first time this name is seen with this stamp (a date or a month), false after
   function claim(name, stamp) {
     const k = 'stt_egg_' + name;
-    try { if (localStorage.getItem(k) === stamp) return false; localStorage.setItem(k, stamp); } catch { /* private mode: allow */ }
+    try {
+      // Keep the last few stamps so an egg that fires for two keys on the same day (or an older plain-string value) can't repeat.
+      const raw = localStorage.getItem(k);
+      let seen = [];
+      try { const v = JSON.parse(raw); seen = Array.isArray(v) ? v : raw ? [raw] : []; } catch { seen = raw ? [raw] : []; }
+      if (seen.includes(stamp)) return false;
+      localStorage.setItem(k, JSON.stringify([...seen, stamp].slice(-8)));
+    } catch { /* private mode: allow */ }
     return true;
   }
   const todayStamp = () => todayStr();
@@ -63,7 +70,8 @@
 
   /* Konami: retro mode */
   html.egg-retro body, html.egg-retro button, html.egg-retro input, html.egg-retro select, html.egg-retro textarea { font-family: "Courier New", Courier, monospace !important; }
-  html.egg-retro body { background: #05060a; filter: contrast(1.18) saturate(1.9) hue-rotate(-12deg); image-rendering: pixelated; }
+  html.egg-retro { filter: contrast(1.18) saturate(1.9) hue-rotate(-12deg); }
+  html.egg-retro body { background: #05060a; image-rendering: pixelated; }
   html.egg-retro #topbar, html.egg-retro thead th, html.egg-retro tfoot td { background: #000 !important; color: #39ff14 !important; border-color: #14532d !important; text-shadow: 0 0 6px #39ff14; }
   html.egg-retro td { border-color: #12331f !important; }
   html.egg-retro td.client-cell.sel { background: #ff2bd6 !important; border-color: #ff2bd6 !important; box-shadow: 0 0 8px #ff2bd6; }
@@ -76,11 +84,10 @@
 
   /* seasonal decorations */
   #seasonLayer { position: fixed; inset: 0; pointer-events: none; z-index: 210; }
-  #seasonLayer .pumpkin { position: absolute; bottom: calc(3px + env(safe-area-inset-bottom, 0px)); width: 38px; opacity: .95; }
-  #seasonLayer .pumpkin.l { left: 6px; }
-  #seasonLayer .pumpkin.r { right: 6px; transform: scaleX(-1); }
-  #seasonLayer .web { position: absolute; top: 0; width: 84px; height: 84px; opacity: .5; }
-  @media (max-width: 640px) { #seasonLayer .pumpkin { width: 28px; left: 4px; } #seasonLayer .pumpkin.r { left: auto; right: 4px; } #seasonLayer .web { width: 60px; height: 60px; opacity: .4; } }
+  /* One pumpkin, tucked into the very bottom-left corner (the empty part of the time column), so it never sits on a number */
+  #seasonLayer .pumpkin { position: absolute; left: -5px; bottom: calc(-6px + env(safe-area-inset-bottom, 0px)); width: 30px; opacity: .95; }
+  #seasonLayer .web { position: absolute; top: 0; width: 66px; height: 66px; opacity: .38; }
+  @media (max-width: 640px) { #seasonLayer .pumpkin { width: 21px; left: -5px; } #seasonLayer .web { width: 48px; height: 48px; opacity: .32; } }
   #seasonLayer .web.l { left: 0; }
   #seasonLayer .web.r { right: 0; transform: scaleX(-1); }
   #seasonLayer canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -603,7 +610,7 @@
     document.body.appendChild(layer);
     seasonName = name;
     if (name === 'halloween') {
-      layer.innerHTML = `<div class="web l">${ART.web()}</div><div class="web r">${ART.web()}</div><div class="pumpkin l">${ART.pumpkin()}</div><div class="pumpkin r">${ART.pumpkin()}</div>`;
+      layer.innerHTML = `<div class="web l">${ART.web()}</div><div class="web r">${ART.web()}</div><div class="pumpkin">${ART.pumpkin()}</div>`;
       if (reduced()) layer.querySelectorAll('svg').forEach(s => { s.pauseAnimations?.(); });
     } else if (name === 'snow' && !reduced()) {
       const cv = document.createElement('canvas'); layer.appendChild(cv);

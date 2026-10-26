@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>SAM TIME TRACKER</title>
 <link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon.svg">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -536,7 +537,7 @@
     #todoSection { padding: 10px; }
     #todoClientPills { gap: 4px; margin-bottom: 10px; }
     .todo-pill { padding: 4px 9px; font-size: 11px; }
-    #todoContent { padding: 10px; }
+    #todoContent { padding: 10px; overflow-x: auto; }
     .add-task-row { flex-wrap: wrap; gap: 6px; }
     .add-task-inp { flex: 1 1 100%; min-width: 0; }
     .add-date-inp { flex: 1; }
@@ -774,10 +775,55 @@ function hideToast() { toastEl.classList.remove('show'); }
 // ── Config ───────────────────────────────────────────────────
 let config = { defaultClients: [], burnRates: [] };
 
+// Saved or synced data can come from older versions or be hand-edited, so make sure
+// it has the right shape before the app touches it. These repair in place.
+// Writes can fail (storage full, private mode); say so instead of silently losing the edit.
+function lsSet(k, v) {
+  try { localStorage.setItem(k, v); }
+  catch (e) { console.warn('save failed', k, e); if (typeof toast === 'function') toast("Couldn't save to this browser (storage full or blocked)."); }
+}
+const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+function cleanConfig(c) {
+  if (!isObj(c) || !Array.isArray(c.defaultClients) || !Array.isArray(c.burnRates)) return false;
+  c.defaultClients = c.defaultClients.filter(n => typeof n === 'string' && n.trim());
+  c.burnRates = c.burnRates.filter(b => isObj(b) && b.id);
+  c.burnRates.forEach(b => { if (!Array.isArray(b.clients)) b.clients = []; });
+  if (!isObj(c.clientColors)) delete c.clientColors;
+  return true;
+}
+function cleanDb(d) {
+  if (!isObj(d)) return {};
+  Object.keys(d).forEach(k => {
+    const day = d[k];
+    if (!isObj(day)) { delete d[k]; return; }
+    if (!Array.isArray(day.clients)) {
+      // No client list: rebuild it from whatever was logged, or drop the empty day so getDay recreates it.
+      const used = isObj(day.blocks) ? Object.values(day.blocks).map(b => b?.client).filter(n => typeof n === 'string') : [];
+      if (!used.length) { delete d[k]; return; }
+      day.clients = [...new Set(used)];
+    }
+    day.clients = day.clients.filter(n => typeof n === 'string');
+    if (!isObj(day.blocks)) day.blocks = {};
+    Object.keys(day.blocks).forEach(t => {
+      const b = day.blocks[t];
+      if (!isObj(b) || !day.clients.includes(b.client) || !/^\d\d:\d\d$/.test(t)) delete day.blocks[t];
+    });
+    if (!isObj(day.descriptions)) day.descriptions = {};
+    if (!isObj(day.descManual)) day.descManual = {};
+  });
+  return d;
+}
+function cleanTodos(t) {
+  if (!isObj(t)) return {};
+  Object.keys(t).forEach(k => { t[k] = Array.isArray(t[k]) ? t[k].filter(isObj) : []; });
+  return t;
+}
+function cleanCustom(c) { return isObj(c) ? c : {}; }
+
 function configLoad() {
   try {
     const stored = JSON.parse(localStorage.getItem('stt_config') || 'null');
-    if (stored && stored.defaultClients && stored.burnRates) {
+    if (cleanConfig(stored)) {
       config = stored;
     } else {
       config = buildDefaultConfig();
@@ -795,25 +841,25 @@ function buildDefaultConfig() {
 }
 
 function configSave(mark = true) {
-  localStorage.setItem('stt_config', JSON.stringify(config));
+  lsSet('stt_config', JSON.stringify(config));
   if (mark) markLocalChange();
 }
 
 // Every real edit records a timestamp (compared against the Gist) and queues an auto-push.
-function markLocalChange() { localStorage.setItem('stt_lastChange', new Date().toISOString()); scheduleAutoPush(); }
+function markLocalChange() { lsSet('stt_lastChange', new Date().toISOString()); scheduleAutoPush(); }
 function getLastLocalChange() { return localStorage.getItem('stt_lastChange') || ''; }
 
 // ── Storage: Tracker ─────────────────────────────────────────
 let db = {};
-function dbLoad() { try { db = JSON.parse(localStorage.getItem('stt_v1') || '{}'); } catch { db = {}; } }
-function dbSave(mark = true) { localStorage.setItem('stt_v1', JSON.stringify(db)); if (mark) markLocalChange(); }
+function dbLoad() { try { db = cleanDb(JSON.parse(localStorage.getItem('stt_v1') || '{}')); } catch { db = {}; } }
+function dbSave(mark = true) { lsSet('stt_v1', JSON.stringify(db)); if (mark) markLocalChange(); }
 
 function getDay(date) {
   if (!db[date]) {
+    // Start from the nearest earlier day's clients (else the nearest later one, else the defaults).
     const keys = Object.keys(db).sort();
-    const clients = keys.length
-      ? [...(db[keys[keys.length - 1]].clients || config.defaultClients)]
-      : [...config.defaultClients];
+    const src = [...keys].reverse().find(k => k < date) ?? keys.find(k => k > date);
+    const clients = src && db[src].clients?.length ? [...db[src].clients] : [...config.defaultClients];
     db[date] = { clients, blocks: {}, descriptions: {}, descManual: {} };
     // A blank new day isn't a real edit; marking it would make this browser look
     // newer than the Gist and block the sync download.
@@ -836,7 +882,7 @@ function setBlock(day, time, client, taskId = null, otherText = '') {
 // ── Storage: To-Dos ──────────────────────────────────────────
 let todos = {};
 function todosLoad() {
-  try { todos = JSON.parse(localStorage.getItem('stt_todos') || '{}'); } catch { todos = {}; }
+  try { todos = cleanTodos(JSON.parse(localStorage.getItem('stt_todos') || '{}')); } catch { todos = {}; }
   const migrate = Object.keys(todos).filter(k => { const n = k.toLowerCase(); return (n.startsWith('hsy') || n === "reese's") && k !== 'Hershey'; });
   if (migrate.length) {
     if (!todos['Hershey']) todos['Hershey'] = [];
@@ -844,12 +890,12 @@ function todosLoad() {
     todosSave();
   }
 }
-function todosSave(mark = true) { localStorage.setItem('stt_todos', JSON.stringify(todos)); if (mark) markLocalChange(); }
+function todosSave(mark = true) { lsSet('stt_todos', JSON.stringify(todos)); if (mark) markLocalChange(); }
 
 // ── Storage: Custom saved "Other" tasks ──────────────────────
 let customTasks = {};
-function customLoad() { try { customTasks = JSON.parse(localStorage.getItem('stt_custom') || '{}'); } catch { customTasks = {}; } }
-function customSave(mark = true) { localStorage.setItem('stt_custom', JSON.stringify(customTasks)); if (mark) markLocalChange(); }
+function customLoad() { try { customTasks = cleanCustom(JSON.parse(localStorage.getItem('stt_custom') || '{}')); } catch { customTasks = {}; } }
+function customSave(mark = true) { lsSet('stt_custom', JSON.stringify(customTasks)); if (mark) markLocalChange(); }
 function getCustomTasks(client) { const g = getTodoGroup(client); return customTasks[g] || []; }
 function addCustomTask(client, text) {
   const g = getTodoGroup(client);
@@ -938,7 +984,7 @@ function parseDueDate(input) {
 function rangeLoad() {
   try { const r = JSON.parse(localStorage.getItem('stt_range') || 'null'); if (r) { rangeStart = r.start; rangeEnd = r.end; } } catch {}
 }
-function rangeSave() { localStorage.setItem('stt_range', JSON.stringify({ start: rangeStart, end: rangeEnd })); }
+function rangeSave() { lsSet('stt_range', JSON.stringify({ start: rangeStart, end: rangeEnd })); }
 
 // Visible hours: the chosen range, widened to include any time logged outside it
 function viewRange(day) {
@@ -1559,7 +1605,7 @@ function closeAddClient() { addClientForm.hidden = true; addClientBtn.hidden = f
 
 function addClient(name) {
   const day = getDay(currentDate);
-  if (day.clients.includes(name)) { toast(`${name} is already on this day.`); addClientInp.select(); return; }
+  if (day.clients.some(c => c.toLowerCase() === name.toLowerCase())) { toast(`${name} is already on this day.`); addClientInp.select(); return; }
   day.clients.push(name); dbSave(); renderAll(); closeAddClient();
   if (document.getElementById('tab-todos').classList.contains('active')) renderTodosTab();
   toast(`Added ${name}.`);
@@ -1999,7 +2045,7 @@ function startEditClient(idx, item, nameSpan) {
     const newName = inp.value.trim();
     if (editBtn) editBtn.style.display = '';
     if (!newName || newName === oldName) { renderSettingsClients(); return; }
-    if (config.defaultClients.some((c, j) => c === newName && j !== idx)) {
+    if (config.defaultClients.some((c, j) => c.toLowerCase() === newName.toLowerCase() && j !== idx)) {
       toast(`"${newName}" already exists.`);
       inp.focus(); return;
     }
@@ -2154,7 +2200,7 @@ function syncCfgLoad() {
     if (s) { syncCfg.token = s.token || ''; syncCfg.gistId = s.gistId || ''; syncCfg.lastSync = s.lastSync || ''; syncCfg.autoSync = s.autoSync !== false; }
   } catch {}
 }
-function syncCfgSave() { localStorage.setItem(SYNC_STORE_KEY, JSON.stringify(syncCfg)); }
+function syncCfgSave() { lsSet(SYNC_STORE_KEY, JSON.stringify(syncCfg)); }
 
 const GIST_FILENAME = 'sam-time-tracker.json';
 const BACKUP_KEY = 'stt_backup';
@@ -2181,20 +2227,20 @@ function dataSize(d) {
 const localSize = () => dataSize({ stt_v1: db, stt_todos: todos });
 
 function saveBackup(reason) {
-  try { localStorage.setItem(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), reason, data: packAllData() })); }
+  try { lsSet(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), reason, data: packAllData() })); }
   catch (e) { console.warn('Backup not saved', e); }
 }
 
 function unpackAllData(json) {
   const d = typeof json === 'string' ? JSON.parse(json) : json;
   if (localSize() > 0) saveBackup('before loading synced data');
-  if (d.stt_v1 && typeof d.stt_v1 === 'object') { db = d.stt_v1; dbSave(false); }
-  if (d.stt_todos && typeof d.stt_todos === 'object') { todos = d.stt_todos; todosSave(false); }
-  if (d.stt_custom && typeof d.stt_custom === 'object') { customTasks = d.stt_custom; customSave(false); }
-  if (d.stt_config?.defaultClients && d.stt_config?.burnRates) { config = d.stt_config; configSave(false); }
+  if (isObj(d.stt_v1)) { db = cleanDb(d.stt_v1); dbSave(false); }
+  if (isObj(d.stt_todos)) { todos = cleanTodos(d.stt_todos); todosSave(false); }
+  if (isObj(d.stt_custom)) { customTasks = cleanCustom(d.stt_custom); customSave(false); }
+  if (cleanConfig(d.stt_config)) { config = d.stt_config; configSave(false); }
   // Local now matches the Gist exactly.
   const stamp = d.exportedAt || new Date().toISOString();
-  localStorage.setItem('stt_lastChange', stamp);
+  lsSet('stt_lastChange', stamp);
   syncCfg.lastSync = stamp;
   syncCfgSave();
 }
@@ -2495,10 +2541,15 @@ function moveColumn(from, to, refocus) {
   const date = currentDate, day = getDay(date), before = [...day.clients];
   if (from === to || from < 0 || to < 0 || from >= before.length || to >= before.length) return;
   const [name] = day.clients.splice(from, 1); day.clients.splice(to, 0, name);
+  // Later days nobody has logged on yet (e.g. tomorrow, already created) follow the new order.
+  const sameSet = c => c.length === before.length && [...c].sort().join('\n') === [...before].sort().join('\n');
+  const followed = Object.keys(db).filter(k => k > date && !Object.keys(db[k].blocks).length && sameSet(db[k].clients));
+  const oldOrders = followed.map(k => [k, db[k].clients]);
+  followed.forEach(k => { db[k].clients = [...day.clients]; });
   dbSave(); renderAll();
   if (refocus) document.querySelectorAll('#thead th.client-hdr')[to]?.focus();
   toast(`Moved ${name}`, () => {
-    db[date].clients = before; dbSave();
+    db[date].clients = before; oldOrders.forEach(([k, c]) => { if (db[k]) db[k].clients = c; }); dbSave();
     if (currentDate === date) renderAll();
   });
 }
@@ -2513,6 +2564,7 @@ function moveColumn(from, to, refocus) {
 
   function place(x) {
     st.x = x;
+    if (headers().length < 2) return;
     const others = headers().filter((_, i) => i !== st.from);
     st.to = slotAt(x);
     ghost.style.left = `${x}px`;
@@ -2535,8 +2587,9 @@ function moveColumn(from, to, refocus) {
   }
 
   function begin(x) {
-    st.started = true; hidePopover();
     const th = headers()[st.from];
+    if (headers().length < 2 || !th) { st = null; return; }
+    st.started = true; hidePopover();
     th.classList.add('col-lifted');
     document.querySelectorAll(`#tbody td[data-ci="${st.from}"]`).forEach(c => c.classList.add('col-src'));
     document.body.classList.add('col-reordering');
@@ -2563,7 +2616,7 @@ function moveColumn(from, to, refocus) {
   function onMouseMove(e) {
     if (!st) return;
     if (!st.started && Math.abs(e.clientX - st.x0) > 5) begin(e.clientX);
-    if (st.started) place(e.clientX);
+    if (st?.started) place(e.clientX);
   }
   function onMouseUp() { end(true); }
   thead.addEventListener('mousedown', e => {
@@ -2771,7 +2824,7 @@ function showTab(tab) {
   if (tab === 'todos') renderTodosTab();
   if (tab === 'settings') renderSettings();
   if (tab === 'tracker') markNow();
-  localStorage.setItem('stt_tab', tab);
+  lsSet('stt_tab', tab);
 }
 
 // Re-render the tracker plus whichever other tab is showing
@@ -2813,7 +2866,7 @@ let graveyardTimer = null, graveyardUrl = null;
 
 async function graveyardGreeting() {
   if (!graveyardDue() || (window.EGGS && !window.EGGS.enabled())) return;
-  try { localStorage.setItem('stt_graveyard', todayStr()); } catch { /* private mode: just show it */ }
+  try { lsSet('stt_graveyard', todayStr()); } catch { /* private mode: just show it */ }
   const el = document.getElementById('graveyardPop');
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Load the picture first so the animation starts as the pop-up appears; if it can't be loaded
@@ -2874,6 +2927,9 @@ document.addEventListener('visibilitychange', () => {
 (function tickNow() { markNow(); eggHook('tick'); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { markNow(); eggHook('tick'); } });
 window.addEventListener('resize', markNow);
+// Re-place the "now" line whenever the grid itself changes size (retro mode, a font finishing loading, rows resizing...),
+// not only once a minute, so it can never be left at an out-of-date position.
+if (window.ResizeObserver) new ResizeObserver(() => markNow()).observe(document.querySelector('#tableWrap table'));
 
 addClientBtn.onclick = openAddClient;
 addClientForm.onsubmit = e => { e.preventDefault(); const name = addClientInp.value.trim(); name ? addClient(name) : closeAddClient(); };
@@ -2888,7 +2944,7 @@ document.getElementById('addSettingsClientBtn').onclick = () => {
   const inp = document.getElementById('newClientInp');
   const name = inp.value.trim();
   if (!name) { inp.focus(); return; }
-  if (config.defaultClients.includes(name)) { toast(`"${name}" already exists.`); inp.focus(); return; }
+  if (config.defaultClients.some(c => c.toLowerCase() === name.toLowerCase())) { toast(`"${name}" already exists.`); inp.focus(); return; }
   config.defaultClients.push(name);
   configSave();
   inp.value = '';

@@ -209,14 +209,19 @@
   tfoot td.zero { color: #c0c7d2; font-weight: normal; }
 
   /* ── Graveyard-shift easter egg ── */
+  /* All the pop-ups (this one and the other easter eggs) stack here, under the header */
+  #eggStack {
+    position: fixed; left: 50%; top: calc(var(--top-h) + 10px); transform: translateX(-50%); z-index: 950;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 24px); pointer-events: none;
+  }
+  #graveyardPop[hidden] { display: none; }
   #graveyardPop {
-    position: fixed; left: 50%; top: calc(var(--top-h) + 10px); z-index: 950;
-    transform: translate(-50%, -24px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.2,.9,.3,1.2);
+    transform: translateY(-24px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s cubic-bezier(.2,.9,.3,1.2);
     display: flex; align-items: center; gap: 12px; width: max-content; max-width: calc(100vw - 24px);
     background: linear-gradient(180deg, #1e1b3a, #14122b); color: #f3f0ff; padding: 8px 10px 8px 8px; border-radius: 14px;
     border: 1px solid #3b3566; box-shadow: 0 12px 32px rgba(10, 8, 30, .45);
   }
-  #graveyardPop.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+  #graveyardPop.show { opacity: 1; transform: none; pointer-events: auto; }
   #graveyardPop .gy-img { display: block; width: 120px; height: 90px; flex-shrink: 0; border-radius: 9px; background: #2a2650; }
   #graveyardPop .gy-text { font-size: 14px; font-weight: bold; line-height: 1.3; }
   #graveyardPop .gy-x { background: none; border: none; color: #a8a2d6; font-size: 14px; cursor: pointer; padding: 4px 6px; border-radius: 6px; align-self: flex-start; }
@@ -682,6 +687,9 @@
       <!-- Panel 3: Cross-Device Sync -->
       <div id="syncPanel"></div>
 
+      <!-- Panel 4: Fun stuff (easter eggs + seasonal decorations; set up by easter-eggs.js) -->
+      <div class="settings-panel" id="funPanel" hidden></div>
+
     </div>
   </div>
 </div>
@@ -689,7 +697,7 @@
 <!-- ── Task popover ── -->
 <div id="taskPopover"></div>
 <div id="toast" role="status" aria-live="polite"></div>
-<div id="graveyardPop" role="status" aria-live="polite" hidden></div>
+<div id="eggStack"><div id="graveyardPop" role="status" aria-live="polite" hidden></div></div>
 
 <script>
 // ── Constants ────────────────────────────────────────────────
@@ -868,7 +876,15 @@ function deleteTask(group, taskId) {
   Object.values(db).forEach(day => Object.keys(day.blocks).forEach(t => { if (bTaskId(day.blocks[t]) === taskId) day.blocks[t].taskId = '__other__'; }));
   todosSave(); dbSave();
 }
-function toggleDone(group, taskId) { const t = findTask(group, taskId); if (t) { t.done = !t.done; todosSave(); } }
+function overdueOpenCount() {
+  const today = todayStr(); let n = 0;
+  allTodoGroups().forEach(g => clientTodos(g).forEach(t => { if (!t.done && t.dueDate && t.dueDate < today) n++; }));
+  return n;
+}
+function toggleDone(group, taskId) {
+  const t = findTask(group, taskId);
+  if (t) { const was = overdueOpenCount(); t.done = !t.done; todosSave(); eggHook('todoToggle', { was, now: overdueOpenCount() }); }
+}
 function updateTaskField(group, taskId, field, val) { const t = findTask(group, taskId); if (t) { t[field] = val; todosSave(); } }
 
 // ── App State ────────────────────────────────────────────────
@@ -1023,6 +1039,7 @@ function renderAll() {
   renderBurnRate();
   updateTotalDisplay(day);
   updateDayInfo();
+  eggHook('render');
 }
 
 function renderHead(day) {
@@ -1201,6 +1218,7 @@ function renderBurnRate() {
     card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl); grid.appendChild(card);
   });
   section.appendChild(grid);
+  eggHook('burn');
 }
 
 // ── Targeted updates ─────────────────────────────────────────
@@ -1222,9 +1240,13 @@ function updateDayInfo() {
   document.getElementById('dayInfo').textContent = n > 0 ? `${n} day${n !== 1 ? 's' : ''} with entries` : '';
 }
 
+// Optional easter eggs (easter-eggs.js) listen for these events. If that file is missing or breaks, the app works the same.
+function eggHook(name, data) { try { window.EGGS?.[name]?.(data); } catch (e) { console.warn('easter egg:', name, e); } }
+
 function afterBlockChange(day) {
   autoFillDescs(day); dbSave();
   refreshCells(day); updateTotalDisplay(day); renderDescs(day); renderBurnRate();
+  eggHook('logged');
 }
 
 // ── Task Popover ─────────────────────────────────────────────
@@ -1401,6 +1423,7 @@ function endDrag() {
     autoFillDescs(day); dbSave();
     refreshCells(day); renderDescs(day); renderBurnRate();
   }
+  eggHook('logged');
 }
 
 tbody.addEventListener('mousedown', e => {
@@ -2789,7 +2812,7 @@ const graveyardDue = () => { try { return localStorage.getItem('stt_graveyard') 
 let graveyardTimer = null, graveyardUrl = null;
 
 async function graveyardGreeting() {
-  if (!graveyardDue()) return;
+  if (!graveyardDue() || (window.EGGS && !window.EGGS.enabled())) return;
   try { localStorage.setItem('stt_graveyard', todayStr()); } catch { /* private mode: just show it */ }
   const el = document.getElementById('graveyardPop');
   const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2848,8 +2871,8 @@ document.addEventListener('visibilitychange', () => {
   if (t !== lastSeenToday) { if (currentDate === lastSeenToday) navTo(t); lastSeenToday = t; }
 });
 // Keep the "now" tag on the minute (not 60s after page load) and fresh after the tab wakes up
-(function tickNow() { markNow(); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') markNow(); });
+(function tickNow() { markNow(); eggHook('tick'); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { markNow(); eggHook('tick'); } });
 window.addEventListener('resize', markNow);
 
 addClientBtn.onclick = openAddClient;
@@ -2943,15 +2966,17 @@ const QUOTES = [
 let quoteIdx = Math.floor(Math.random() * QUOTES.length);
 const quoteEl = document.getElementById('quoteDisplay');
 
+const activeQuotes = () => window.EGGS?.quotes?.() || QUOTES;   // the easter eggs can swap the list for a day
 function showNextQuote(immediate) {
   if (immediate) {
-    quoteEl.textContent = QUOTES[quoteIdx];
+    const q = activeQuotes(); quoteEl.textContent = q[quoteIdx % q.length];
     return;
   }
   quoteEl.classList.add('fade');
   setTimeout(() => {
-    quoteIdx = (quoteIdx + 1) % QUOTES.length;
-    quoteEl.textContent = QUOTES[quoteIdx];
+    const q = activeQuotes();
+    quoteIdx = (quoteIdx + 1) % q.length;
+    quoteEl.textContent = q[quoteIdx];
     quoteEl.classList.remove('fade');
   }, 650);
 }
@@ -2968,6 +2993,7 @@ scrollToNow();
 syncBooted = true;
 autoSync();
 </script>
+<script src="easter-eggs.js" defer></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));

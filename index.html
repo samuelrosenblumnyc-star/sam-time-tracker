@@ -2874,6 +2874,9 @@ document.addEventListener('visibilitychange', () => {
 (function tickNow() { markNow(); eggHook('tick'); setTimeout(tickNow, 60000 - (Date.now() % 60000) + 50); })();
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { markNow(); eggHook('tick'); } });
 window.addEventListener('resize', markNow);
+// Re-place the "now" line whenever the grid itself changes size (retro mode, a font finishing loading, rows resizing...),
+// not only once a minute, so it can never be left at an out-of-date position.
+if (window.ResizeObserver) new ResizeObserver(() => markNow()).observe(document.querySelector('#tableWrap table'));
 
 addClientBtn.onclick = openAddClient;
 addClientForm.onsubmit = e => { e.preventDefault(); const name = addClientInp.value.trim(); name ? addClient(name) : closeAddClient(); };

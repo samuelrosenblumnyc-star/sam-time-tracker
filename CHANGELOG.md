@@ -5,7 +5,9 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-_Nothing right now. Everything requested so far is live._
+- **2026-10-26: Fixed two bugs from the easter eggs update.**
+  - *The red "now" line could end up in the wrong place after retro mode.* Retro mode changes the grid's fonts and row heights, and the line was only re-placed once a minute, so it stayed at an out-of-date position (about 8 minutes off on one screen) until the next tick. The line now re-places itself whenever the grid changes size (retro mode on or off, fonts loading, rows resizing), so it can't go stale.
+  - *The Halloween pumpkin covered the Total number.* There is now just one small pumpkin, tucked into the very bottom-left corner (the empty part of the time column), and the cobwebs are smaller and fainter. Checked on several screen sizes (including 1919x910 and two phone sizes), at the normal position and with the page scrolled to the bottom: it never touches any text.
 
 ## Published
 

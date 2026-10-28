@@ -1,0 +1,162 @@
+/* Dark theme: applied when <html data-theme="dark"> (set from Settings > Appearance, or from the device's setting when on Auto). */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --f-surface: #1a212c; --f-surface2: #222b38; --f-border: #313c4d; --f-text: #e5e9f0; --f-muted: #9aa7b8;
+  --f-accent: #5b9bff; --f-head: #7fb0e6; --f-hover: #25344a; --f-warn-bg: #3a2f12; --f-warn-bd: #7a5c16; --f-warn-tx: #fcd9a0;
+}
+html[data-theme="dark"] body { background: #0f141b; color: #e5e9f0; }
+html[data-theme="dark"] #topbar { background: #0f1b2b; }
+html[data-theme="dark"] #appTabBar { background: #0f141b; border-bottom-color: #3b5a80; }
+html[data-theme="dark"] .app-tab-btn { color: #8b98aa; }
+html[data-theme="dark"] .app-tab-btn.active { color: #9cc4f5; border-bottom-color: #9cc4f5; }
+html[data-theme="dark"] .app-tab-btn:hover:not(.active) { color: #cbd5e1; background: rgba(255,255,255,.05); }
+
+/* Controls */
+html[data-theme="dark"] #controls { background: #161d27; border-bottom-color: #2a3544; }
+html[data-theme="dark"] .ctrl-btn { background: #202a37; color: #e5e9f0; border-color: #3a4658; }
+html[data-theme="dark"] .ctrl-btn:hover:not(:disabled) { background: #2a3647; }
+html[data-theme="dark"] .ctrl-btn.primary { background: #2f5d94; border-color: #2f5d94; color: #fff; }
+html[data-theme="dark"] .ctrl-btn.primary:hover { background: #3a70b0; }
+html[data-theme="dark"] .ctrl-btn.danger { color: #f87171; border-color: #7f2d2d; }
+html[data-theme="dark"] .ctrl-btn.danger:hover { background: #3a1d1d; }
+html[data-theme="dark"] .ctrl-btn.ft-run { background: #dc2626; border-color: #dc2626; color: #fff; }
+html[data-theme="dark"] #rangeDisplay { background: #202a37; border-color: #3a4658; color: #cbd5e1; }
+html[data-theme="dark"] #rangeDisplay:hover { background: #2a3647; }
+html[data-theme="dark"] #controls-sep { background: #3a4658; }
+html[data-theme="dark"] #addClientInp { background: #1a212c; color: #e5e9f0; }
+html[data-theme="dark"] .jump-link { color: #7fb0e6; }
+html[data-theme="dark"] .jump-link:hover { background: #25344a; }
+html[data-theme="dark"] #dayInfo { color: #7d8a9c; }
+
+/* Time grid */
+html[data-theme="dark"] #tableWrap { background: #161d27; }
+html[data-theme="dark"] #thead th { background: #17314f; border-right-color: #284a73; }
+html[data-theme="dark"] #thead th.client-hdr:hover { background: #1f4068; }
+html[data-theme="dark"] tbody tr.overnight { background: #131921; }
+html[data-theme="dark"] tbody tr.working { background: #161d27; }
+html[data-theme="dark"] tbody tr.working:hover { background: #1b2635; }
+html[data-theme="dark"] td { border-right-color: #232d3a; border-bottom-color: #232d3a; }
+html[data-theme="dark"] tbody tr.hour-start td { border-top-color: #4a5a70; }
+html[data-theme="dark"] td.time-cell { color: #6a788b; }
+html[data-theme="dark"] tr.hour-start td.time-cell { color: #cbd5e1; }
+html[data-theme="dark"] td.client-cell.touch-held { background: #1e3a66; }
+html[data-theme="dark"] td.client-cell:hover:not(.sel) { background: #1e3350; }
+html[data-theme="dark"] td.client-cell.sel { border-right-color: #161d27; }
+html[data-theme="dark"] td.client-cell.sel.no-task { background: #3c5fa5; border-bottom-color: #3c5fa5; }
+html[data-theme="dark"] tbody tr.hour-start td.client-cell.sel.no-task:not(.run-start) { border-top-color: #3c5fa5; }
+html[data-theme="dark"] td.client-cell.sel.run-end { border-bottom-color: #161d27; }
+html[data-theme="dark"] td.client-cell.sel.no-task.run-end.hour-end { border-bottom-color: #3c5fa5; }
+html[data-theme="dark"] td.no-task .cell-lbl { color: #dbe7ff; }
+html[data-theme="dark"] td.total-cell { color: #6a788b; }
+html[data-theme="dark"] tfoot td { background: #1b2430; border-top-color: #3b5a80; color: #e5e9f0; }
+html[data-theme="dark"] tfoot td.zero { color: #4a586b; }
+
+/* Pop-ups */
+html[data-theme="dark"] #taskPopover { background: #1a212c; border-color: #3a4658; box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+html[data-theme="dark"] #taskPopover.mobile-sheet { border-top-color: #3a4658; }
+html[data-theme="dark"] .pop-header { color: #9cc4f5; border-bottom-color: #2a3544; }
+html[data-theme="dark"] .pop-opt { color: #d6dde8; }
+html[data-theme="dark"] .pop-opt:hover { background: #25344a; color: #9cc4f5; }
+html[data-theme="dark"] .pop-opt.is-sel { background: #1f3350; color: #7fb0e6; }
+html[data-theme="dark"] .pop-sep { background: #2a3544; }
+html[data-theme="dark"] .pop-clear { color: #8b98aa; }
+html[data-theme="dark"] .pop-clear:hover { background: #3a1d1d; color: #f87171; }
+html[data-theme="dark"] .pop-saved-del { color: #5b6a7e; }
+html[data-theme="dark"] .pop-saved-del:hover { background: #3a1d1d; color: #f87171; }
+html[data-theme="dark"] #taskPopover input, html[data-theme="dark"] #taskPopover select { background: #202a37; color: #e5e9f0; border-color: #3a4658; }
+html[data-theme="dark"] #toast { background: #2b3647; }
+
+/* Descriptions, burn rate, export */
+html[data-theme="dark"] #descSection, html[data-theme="dark"] #burnSection, html[data-theme="dark"] #exportBar { background: #161d27; border-color: #2a3544; }
+html[data-theme="dark"] #descSection h2, html[data-theme="dark"] .burn-hdr strong { color: #9cc4f5; }
+html[data-theme="dark"] .desc-label small, html[data-theme="dark"] .burn-hdr span { color: #8b98aa; }
+html[data-theme="dark"] .regen-btn { border-color: #2f5d94; color: #7fb0e6; }
+html[data-theme="dark"] .regen-btn:hover { background: #1f3350; }
+html[data-theme="dark"] .desc-textarea { background: #1a212c; border-color: #3a4658; color: #e5e9f0; }
+html[data-theme="dark"] .desc-textarea.auto-mode { background: #182436; border-color: #2f5d94; }
+html[data-theme="dark"] .desc-textarea.over-limit { background: #3a1d1d; }
+html[data-theme="dark"] .char-count { color: #6a788b; }
+html[data-theme="dark"] .desc-more { color: #7fb0e6; }
+html[data-theme="dark"] .desc-empty, html[data-theme="dark"] .burn-hint { color: #7d8a9c; }
+html[data-theme="dark"] .burn-card:hover { background: #1b2635; }
+html[data-theme="dark"] .burn-card-label span, html[data-theme="dark"] .burn-pct, html[data-theme="dark"] .burn-proj { color: #9aa7b8; }
+html[data-theme="dark"] .burn-track { background: #2a3544; }
+html[data-theme="dark"] .burn-pace { background: #e5e9f0; }
+html[data-theme="dark"] .pace-chip { background: #2a3544; color: #cbd5e1; }
+html[data-theme="dark"] .pace-chip.pace-ahead { background: #14392a; color: #6ee7a0; }
+html[data-theme="dark"] .pace-chip.pace-behind { background: #3d3114; color: #fcd34d; }
+html[data-theme="dark"] .pace-chip.pace-over { background: #4a1d1d; color: #fca5a5; }
+
+/* To-dos */
+html[data-theme="dark"] .todo-pill { background: #202a37; border-color: #3a4658; color: #d6dde8; }
+html[data-theme="dark"] .todo-pill.active { background: #2f5d94; border-color: #2f5d94; color: #fff; }
+html[data-theme="dark"] .todo-pill:hover:not(.active) { background: #2a3647; }
+html[data-theme="dark"] .pill-count { background: #2f3b4d; color: #cbd5e1; }
+html[data-theme="dark"] #todoContent { background: #161d27; }
+html[data-theme="dark"] #todoContent h3 { color: #9cc4f5; }
+html[data-theme="dark"] .todo-subtitle { color: #8b98aa; }
+html[data-theme="dark"] .todo-table th { color: #9aa7b8; border-bottom-color: #2a3544; }
+html[data-theme="dark"] .todo-table td { border-bottom-color: #232d3a; }
+html[data-theme="dark"] .todo-task-inp:focus, html[data-theme="dark"] .todo-due-inp:focus, html[data-theme="dark"] .todo-priority-sel:focus, html[data-theme="dark"] .todo-repeat-sel:focus { outline-color: #2f5d94; border-color: #2f5d94; }
+html[data-theme="dark"] .todo-notes-inp:focus { background: #182436; border-color: #2f5d94; }
+html[data-theme="dark"] .todo-del-btn { color: #5b6a7e; }
+html[data-theme="dark"] .todo-del-btn:hover { background: #3a1d1d; color: #f87171; }
+html[data-theme="dark"] .add-task-inp, html[data-theme="dark"] .add-date-inp, html[data-theme="dark"] .settings-text-inp { background: #1a212c; border-color: #3a4658; color: #e5e9f0; }
+html[data-theme="dark"] .due-text.bad, html[data-theme="dark"] .due-text.bad:focus { background: #3a1d1d; }
+html[data-theme="dark"] .due-hint { color: #9aa7b8; }
+html[data-theme="dark"] .add-task-btn { background: #2f5d94; }
+html[data-theme="dark"] .todo-sort-bar { color: #9aa7b8; }
+html[data-theme="dark"] .todo-sort-btn { background: #202a37; border-color: #3a4658; color: #d6dde8; }
+html[data-theme="dark"] .todo-sort-btn.active { background: #2f5d94; border-color: #2f5d94; color: #fff; }
+html[data-theme="dark"] .todo-all-group-hdr { color: #9aa7b8; }
+html[data-theme="dark"] .priority-high { background: #4a1d1d; color: #fca5a5; }
+html[data-theme="dark"] .priority-med { background: #3d3114; color: #fcd34d; }
+html[data-theme="dark"] .priority-low { background: #14392a; color: #6ee7a0; }
+html[data-theme="dark"] select, html[data-theme="dark"] input[type=date], html[data-theme="dark"] input[type=time] { color-scheme: dark; }
+html[data-theme="dark"] .todo-priority-sel option, html[data-theme="dark"] .todo-repeat-sel option { background: #1a212c; color: #e5e9f0; }
+
+/* Settings */
+html[data-theme="dark"] .settings-panel { background: #161d27; color: #e5e9f0; }
+html[data-theme="dark"] .settings-panel > h2 { color: #9cc4f5; }
+html[data-theme="dark"] .settings-desc, html[data-theme="dark"] .settings-reset-note { color: #8b98aa; }
+html[data-theme="dark"] .settings-client-item { background: #1a212c; border-color: #2f3b4d; }
+html[data-theme="dark"] .settings-client-item.drag-over { background: #1f3350; border-color: #2f5d94; }
+html[data-theme="dark"] .drag-handle { color: #5b6a7e; }
+html[data-theme="dark"] .settings-client-name-inp, html[data-theme="dark"] .settings-br-name, html[data-theme="dark"] .settings-br-target { background: #1a212c; border-color: #3a4658; color: #e5e9f0; }
+html[data-theme="dark"] .settings-br-name { color: #9cc4f5; }
+html[data-theme="dark"] .s-icon-btn { color: #8b98aa; }
+html[data-theme="dark"] .s-icon-btn:hover { background: #2a3647; color: #e5e9f0; border-color: #3a4658; }
+html[data-theme="dark"] .s-icon-btn.del:hover { background: #3a1d1d; color: #f87171; border-color: #7f2d2d; }
+html[data-theme="dark"] .settings-br-card { background: #1a212c; border-color: #2f3b4d; }
+html[data-theme="dark"] .br-target-group, html[data-theme="dark"] .settings-br-lbl { color: #9aa7b8; }
+html[data-theme="dark"] .client-cb-pill { background: #202a37; border-color: #3a4658; color: #d6dde8; }
+html[data-theme="dark"] .client-cb-pill:hover { background: #25344a; border-color: #2f5d94; }
+html[data-theme="dark"] .client-cb-pill.checked { background: #1f3a63; border-color: #3b82f6; color: #93c5fd; }
+html[data-theme="dark"] .br-no-clients { color: #6a788b; }
+html[data-theme="dark"] .settings-reset-row { border-top-color: #2a3544; }
+html[data-theme="dark"] .sync-field-lbl { color: #9aa7b8; }
+html[data-theme="dark"] .sync-field-lbl input, html[data-theme="dark"] #syncPanel input[type=text], html[data-theme="dark"] #syncPanel input[type=password] { background: #1a212c; border-color: #3a4658; color: #e5e9f0; }
+html[data-theme="dark"] .sync-status { color: #9aa7b8; }
+html[data-theme="dark"] .sync-gist-id { background: #202a37; border-color: #3a4658; color: #e5e9f0; }
+html[data-theme="dark"] .sync-ok { color: #4ade80; }
+html[data-theme="dark"] .sync-err { color: #f87171; }
+
+/* Home */
+html[data-theme="dark"] .home-panel { background: #161d27; }
+html[data-theme="dark"] .home-panel h2, html[data-theme="dark"] .home-time-total { color: #9cc4f5; }
+html[data-theme="dark"] .home-task-item, html[data-theme="dark"] .home-time-row { border-bottom-color: #232d3a; }
+html[data-theme="dark"] .home-task-group, html[data-theme="dark"] .home-task-due, html[data-theme="dark"] .home-empty, html[data-theme="dark"] .home-more { color: #8b98aa; }
+html[data-theme="dark"] .home-task-group:hover { color: #7fb0e6; }
+
+/* Reminder cards / gap strip pieces that need extra help */
+html[data-theme="dark"] .gap-chip .gap-add { color: #7fb0e6; }
+html[data-theme="dark"] td.client-cell.gapcell:not(.sel) { background-image: repeating-linear-gradient(135deg, rgba(245,158,11,.28) 0 4px, transparent 4px 9px); }
+html[data-theme="dark"] .bar-stack { background: #222b38; }
+html[data-theme="dark"] .rec-days button.on { color: #fff; }
+html[data-theme="dark"] #funPanel label { color: #d6dde8 !important; }
+html[data-theme="dark"] #funPanel input { accent-color: #7fb0e6 !important; }
+/* inline-styled bits in the main script (browsers rewrite hex colours in style attributes as rgb(...)) */
+html[data-theme="dark"] [style*="color: rgb(85, 85, 85)"], html[data-theme="dark"] [style*="color: rgb(102, 102, 102)"], html[data-theme="dark"] [style*="color: rgb(136, 136, 136)"],
+html[data-theme="dark"] [style*="color:#555"], html[data-theme="dark"] [style*="color:#666"], html[data-theme="dark"] [style*="color:#888"] { color: #aeb9c8 !important; }
+html[data-theme="dark"] #taskPopover button[style*="rgb(243, 244, 246)"], html[data-theme="dark"] #taskPopover button[style*="f3f4f6"] { background: #2a3647 !important; border-color: #3a4658 !important; color: #e5e9f0 !important; }
+html[data-theme="dark"] #settingsSection [style*="rgb(240, 240, 240)"], html[data-theme="dark"] #settingsSection [style*="#f0f0f0"] { border-top-color: #2a3544 !important; }

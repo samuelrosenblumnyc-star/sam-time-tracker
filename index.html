@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Time Tracker">
 <meta name="theme-color" content="#1b3a5c">
 <link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap" rel="stylesheet">
+<script>try{var _t=localStorage.getItem('stt_theme')||'auto';document.documentElement.dataset.theme=(_t==='dark'||(_t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches))?'dark':'light';}catch(e){}</script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root { --top-h: calc(52px + env(safe-area-inset-top, 0px)); }
@@ -48,7 +49,7 @@
   #todayBtn:not(.is-today) { background: #fbbf24; border-color: #fbbf24; color: #1b3a5c; font-weight: bold; }
   #todayBtn.is-today { opacity: .45; cursor: default; }
   #dayName { font-size: 12px; color: rgba(255,255,255,.7); white-space: nowrap; }
-  #totalWrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 120px; margin-left: auto; }
+  #totalWrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 120px; }
   #totalDisplay {
     font-size: 17px; font-weight: bold; text-align: right; transition: color .2s; white-space: nowrap;
   }
@@ -56,12 +57,23 @@
   #totalBar { width: 100%; height: 4px; background: rgba(255,255,255,.18); border-radius: 2px; overflow: hidden; }
   #totalFill { height: 100%; width: 0; background: #60a5fa; border-radius: 2px; transition: width .3s ease; }
   #totalFill.done { background: #4ade80; }
+  /* Sync badge: always visible in the top right, so you can tell at a glance whether the other device has your latest */
   #syncIndicator {
-    font-size: 10px; color: rgba(255,255,255,.65); display: none;
-    white-space: nowrap; flex-shrink: 0;
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto;
+    font-size: 11px; font-weight: bold; color: rgba(255,255,255,.85); white-space: nowrap;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.22); border-radius: 12px; padding: 3px 10px 3px 8px; cursor: pointer;
   }
-  #syncIndicator.show { display: inline; }
-  #syncIndicator.sync-err { color: #fca5a5; }
+  #syncIndicator:hover { background: rgba(255,255,255,.22); }
+  #syncIndicator .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #9ca3af; flex-shrink: 0; }
+  #syncIndicator.st-ok .sync-dot { background: #4ade80; }
+  #syncIndicator.st-pending .sync-dot { background: #fbbf24; }
+  #syncIndicator.st-syncing .sync-dot { background: #60a5fa; animation: syncPulse 1s ease-in-out infinite; }
+  #syncIndicator.st-error { color: #fecaca; }
+  #syncIndicator.st-error .sync-dot { background: #f87171; }
+  #syncIndicator.st-offline .sync-dot { background: #94a3b8; box-shadow: 0 0 0 2px rgba(148,163,184,.35); }
+  #syncIndicator.st-local { color: rgba(255,255,255,.6); }
+  @keyframes syncPulse { 50% { opacity: .35; } }
+  @media (prefers-reduced-motion: reduce) { #syncIndicator.st-syncing .sync-dot { animation: none; } }
   #quoteDisplay {
     font-family: 'Permanent Marker', cursive;
     font-size: 13px; font-style: normal; color: rgba(255,255,100,.85);
@@ -121,7 +133,7 @@
   .jump-link:hover { background: #eff6ff; }
 
   /* ── Grid ── */
-  #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 80px); background: #fff; }
+  #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 40px - var(--ctl-h, 40px)); background: #fff; }
   #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(160px + var(--cols, 8) * 64px); }
 
   thead th {
@@ -321,6 +333,11 @@
   .burn-fill.warn { background: #f59e0b; }
   .burn-pct { font-size: 10px; color: #999; text-align: right; margin-top: 3px; }
   .burn-pct.behind { color: #b45309; }
+  .pace-chip { font-weight: bold; padding: 0 5px; border-radius: 8px; background: #eef2f7; color: #475569; }
+  .pace-chip.pace-ahead { background: #dcfce7; color: #15803d; }
+  .pace-chip.pace-behind { background: #fef3c7; color: #b45309; }
+  .pace-chip.pace-over { background: #fee2e2; color: #b91c1c; }
+  .burn-proj { font-size: 10px; color: #64748b; text-align: right; margin-top: 1px; }
 
   /* ── Export bar ── */
   #exportBar { background: #fff; border-top: 1px solid #eee; padding: 10px 16px; display: flex; gap: 8px; margin-top: 8px; }
@@ -466,9 +483,10 @@
   .priority-high { background: #fee2e2; color: #dc2626; }
   .priority-med  { background: #fef3c7; color: #d97706; }
   .priority-low  { background: #dcfce7; color: #16a34a; }
-  .todo-priority-sel { font-size: 11px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 3px; font-family: inherit; cursor: pointer; max-width: 70px; }
-  .todo-priority-sel:focus { outline: none; border-color: #bfdbfe; }
-  .done-row .todo-priority-sel { opacity: .5; }
+  .todo-priority-sel, .todo-repeat-sel { font-size: 11px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 3px; font-family: inherit; cursor: pointer; max-width: 70px; }
+  .todo-priority-sel:focus, .todo-repeat-sel:focus { outline: none; border-color: #bfdbfe; }
+  .done-row .todo-priority-sel, .done-row .todo-repeat-sel { opacity: .5; }
+  .todo-repeat-sel { max-width: 92px; }
 
   /* ── Sort bar ── */
   .todo-sort-bar { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 12px; color: #666; }
@@ -494,6 +512,8 @@
     #dateInput { padding: 4px 4px; font-size: 12px; max-width: 120px; min-width: 0; flex-shrink: 1; }
     #todayBtn { padding: 5px 7px; font-size: 11px; flex-shrink: 0; }
     #totalWrap { min-width: 0; flex-shrink: 0; }
+    #syncIndicator { padding: 5px; gap: 0; }
+    #syncIndicator .sync-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
     #totalDisplay { font-size: 14px; }
 
     /* Tab bar */
@@ -522,6 +542,11 @@
     thead th.total-hdr { width: 42px; }
     tfoot td { padding: 4px 2px; font-size: 10px; }
     tfoot td:first-child { padding-right: 5px; }
+
+    /* Home: one column (two long, non-wrapping panels pushed the page wider than the screen) */
+    #homeSection { padding: 10px; }
+    .home-grid { grid-template-columns: minmax(0, 1fr); }
+    .home-panel { min-width: 0; }
 
     /* Descriptions */
     #descSection { padding: 10px; }
@@ -579,6 +604,8 @@
     #taskPopover.mobile-sheet .pop-sep { margin: 4px 0; }
   }
 </style>
+<link rel="stylesheet" href="features.css">
+<link rel="stylesheet" href="dark.css">
 </head>
 <body>
 
@@ -591,7 +618,7 @@
   <button id="todayBtn" title="Jump to today (T)">Today</button>
   <span id="dayName"></span>
   <div id="quoteDisplay" title="Click for next quote"></div>
-  <span id="syncIndicator"></span>
+  <button id="syncIndicator" class="st-local" title="Sync status" aria-label="Sync status"><i class="sync-dot"></i><span class="sync-txt">Local only</span></button>
   <div id="totalWrap" title="Hours logged on this day">
     <div id="totalDisplay">0.00 / 8.0 hrs</div>
     <div id="totalBar"><div id="totalFill"></div></div>
@@ -602,6 +629,7 @@
 <div id="appTabBar">
   <button class="app-tab-btn" data-tab="home">&#8962; Home</button>
   <button class="app-tab-btn active" data-tab="tracker">&#9719; Time Tracker</button>
+  <button class="app-tab-btn" data-tab="summary">&#9638; Summary</button>
   <button class="app-tab-btn" data-tab="todos">&#9745; To-Do Lists</button>
   <button class="app-tab-btn" data-tab="settings">&#9881; Settings</button>
 </div>
@@ -645,6 +673,11 @@
   <div id="exportBar">
     <button class="ctrl-btn" id="exportBtn">Export CSV</button>
   </div>
+</div>
+
+<!-- ── Summary Tab (built by features.js) ── -->
+<div id="tab-summary" class="tab-content">
+  <div id="summarySection"></div>
 </div>
 
 <!-- ── To-Do Lists Tab ── -->
@@ -783,8 +816,10 @@ let config = { defaultClients: [], burnRates: [] };
 // it has the right shape before the app touches it. These repair in place.
 // Writes can fail (storage full, private mode); say so instead of silently losing the edit.
 function lsSet(k, v) {
-  try { localStorage.setItem(k, v); }
-  catch (e) { console.warn('save failed', k, e); if (typeof toast === 'function') toast("Couldn't save to this browser (storage full or blocked)."); }
+  try { localStorage.setItem(k, v); return; } catch (e) { var err = e; }
+  // Storage full: the automatic backups are the first thing to give up space (oldest first), then retry.
+  try { while (featHook('freeSpace')) { try { localStorage.setItem(k, v); return; } catch { /* still full */ } } } catch { /* ignore */ }
+  console.warn('save failed', k, err); if (typeof toast === 'function') toast("Couldn't save to this browser (storage full or blocked).");
 }
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 function cleanConfig(c) {
@@ -793,6 +828,11 @@ function cleanConfig(c) {
   c.burnRates = c.burnRates.filter(b => isObj(b) && b.id);
   c.burnRates.forEach(b => { if (!Array.isArray(b.clients)) b.clients = []; });
   if (!isObj(c.clientColors)) delete c.clientColors;
+  if (!Array.isArray(c.recurring)) delete c.recurring;
+  else {
+    c.recurring = c.recurring.filter(r => isObj(r) && r.id && typeof r.client === 'string' && /^\d\d:\d\d$/.test(r.start) && /^\d\d:\d\d$/.test(r.end));
+    c.recurring.forEach(r => { r.days = Array.isArray(r.days) ? r.days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6) : []; });
+  }
   return true;
 }
 function cleanDb(d) {
@@ -814,6 +854,7 @@ function cleanDb(d) {
     });
     if (!isObj(day.descriptions)) day.descriptions = {};
     if (!isObj(day.descManual)) day.descManual = {};
+    if (!Array.isArray(day.rec)) delete day.rec;
   });
   return d;
 }
@@ -845,18 +886,71 @@ function buildDefaultConfig() {
 }
 
 function configSave(mark = true) {
-  lsSet('stt_config', JSON.stringify(config));
+  const str = JSON.stringify(config); undoNote('config', str, mark);
+  lsSet('stt_config', str);
   if (mark) markLocalChange();
 }
 
+// ── Undo / redo for everything (time entries, to-dos, saved tasks, settings) ──
+// Every real edit stores the data as it was just before. A quick burst (typing, painting cells) counts as one step.
+const undoState = { snap: {}, undo: [], redo: [], applying: false, t: 0 };
+const UNDO_MAX = 40;
+function undoNote(store, str, mark) {
+  const u = undoState, prev = u.snap[store];
+  u.snap[store] = str;
+  if (u.applying || !mark || prev === undefined || prev === str) return;
+  const before = { ...u.snap, [store]: prev }, now = Date.now(), last = u.undo[u.undo.length - 1];
+  if (last && now - u.t < 700 && last.what.length === 1 && last.what[0] === store) { /* same kind of edit in quick succession (typing): one step */ }
+  else { u.undo.push({ state: before, what: [store] }); if (u.undo.length > UNDO_MAX) u.undo.shift(); }
+  u.t = now; u.redo.length = 0;
+  featHook('undoChanged');
+}
+function undoReset() {
+  const u = undoState; u.undo.length = 0; u.redo.length = 0; u.t = 0;
+  u.snap = { db: JSON.stringify(db), todos: JSON.stringify(todos), custom: JSON.stringify(customTasks), config: JSON.stringify(config) };
+  featHook('undoChanged');
+}
+const UNDO_NAMES = { db: 'time entries', todos: 'to-dos', custom: 'saved tasks', config: 'settings' };
+function undoStep(dir) {
+  const u = undoState, from = dir === 'undo' ? u.undo : u.redo, to = dir === 'undo' ? u.redo : u.undo;
+  const e = from.pop();
+  if (!e) { toast(dir === 'undo' ? 'Nothing to undo.' : 'Nothing to redo.'); return false; }
+  const current = { ...u.snap };
+  u.applying = true; u.t = 0;
+  try {
+    e.what.forEach(k => {
+      const str = e.state[k]; if (str === undefined || str === current[k]) return;
+      const v = JSON.parse(str);
+      if (k === 'db') { db = cleanDb(v); dbSave(); }
+      else if (k === 'todos') { todos = cleanTodos(v); todosSave(); }
+      else if (k === 'custom') { customTasks = cleanCustom(v); customSave(); }
+      else if (k === 'config' && cleanConfig(v)) { config = v; configSave(); }
+    });
+  } finally { u.applying = false; }
+  to.push({ state: current, what: e.what });
+  u.snap = { ...u.snap };
+  featHook('undoChanged'); hidePopover(); refreshVisible();
+  toast(`${dir === 'undo' ? 'Undid' : 'Redid'} a change to ${e.what.map(k => UNDO_NAMES[k]).join(' and ')}.`);
+  return true;
+}
+document.addEventListener('keydown', e => {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z') { e.preventDefault(); undoStep(e.shiftKey ? 'redo' : 'undo'); }
+  else if (k === 'y') { e.preventDefault(); undoStep('redo'); }
+});
+
+// Optional features (features.js) hook in here. If that file is missing or breaks, the app works the same.
+function featHook(name, ...a) { try { return window.FEAT?.[name]?.(...a); } catch (e) { console.warn('feature:', name, e); } }
+
 // Every real edit records a timestamp (compared against the Gist) and queues an auto-push.
-function markLocalChange() { lsSet('stt_lastChange', new Date().toISOString()); scheduleAutoPush(); }
+function markLocalChange() { lsSet('stt_lastChange', new Date().toISOString()); scheduleAutoPush(); if (syncBooted) renderSyncBadge(); }
 function getLastLocalChange() { return localStorage.getItem('stt_lastChange') || ''; }
 
 // ── Storage: Tracker ─────────────────────────────────────────
 let db = {};
 function dbLoad() { try { db = cleanDb(JSON.parse(localStorage.getItem('stt_v1') || '{}')); } catch { db = {}; } }
-function dbSave(mark = true) { lsSet('stt_v1', JSON.stringify(db)); if (mark) markLocalChange(); }
+function dbSave(mark = true) { const str = JSON.stringify(db); undoNote('db', str, mark); lsSet('stt_v1', str); if (mark) markLocalChange(); }
 
 function getDay(date) {
   if (!db[date]) {
@@ -894,12 +988,12 @@ function todosLoad() {
     todosSave();
   }
 }
-function todosSave(mark = true) { lsSet('stt_todos', JSON.stringify(todos)); if (mark) markLocalChange(); }
+function todosSave(mark = true) { const str = JSON.stringify(todos); undoNote('todos', str, mark); lsSet('stt_todos', str); if (mark) markLocalChange(); }
 
 // ── Storage: Custom saved "Other" tasks ──────────────────────
 let customTasks = {};
 function customLoad() { try { customTasks = cleanCustom(JSON.parse(localStorage.getItem('stt_custom') || '{}')); } catch { customTasks = {}; } }
-function customSave(mark = true) { lsSet('stt_custom', JSON.stringify(customTasks)); if (mark) markLocalChange(); }
+function customSave(mark = true) { const str = JSON.stringify(customTasks); undoNote('custom', str, mark); lsSet('stt_custom', str); if (mark) markLocalChange(); }
 function getCustomTasks(client) { const g = getTodoGroup(client); return customTasks[g] || []; }
 function addCustomTask(client, text) {
   const g = getTodoGroup(client);
@@ -919,7 +1013,7 @@ function getTodoGroup(client) {
 
 function clientTodos(client) { const g = getTodoGroup(client); if (!todos[g]) todos[g] = []; return todos[g]; }
 function findTask(client, taskId) { return clientTodos(client).find(t => t.id === taskId) || null; }
-function addTask(group, text, dueDate, dueTime) { clientTodos(group).push({ id: uid(), task: text, dueDate: dueDate || '', dueTime: dueTime || '', notes: '', priority: 0, done: false }); todosSave(); }
+function addTask(group, text, dueDate, dueTime, repeat = '') { const t = { id: uid(), task: text, dueDate: dueDate || '', dueTime: dueTime || '', notes: '', priority: 0, done: false }; if (repeat) t.repeat = repeat; clientTodos(group).push(t); todosSave(); }
 function deleteTask(group, taskId) {
   const g = getTodoGroup(group);
   todos[g] = (todos[g] || []).filter(t => t.id !== taskId);
@@ -931,9 +1025,40 @@ function overdueOpenCount() {
   allTodoGroups().forEach(g => clientTodos(g).forEach(t => { if (!t.done && t.dueDate && t.dueDate < today) n++; }));
   return n;
 }
+// Repeating to-dos: completing one creates the next copy with the following due date; un-completing it removes that copy again.
+const REPEATS = { '': 'Never', daily: 'Daily', weekdays: 'Weekdays', weekly: 'Weekly', biweekly: 'Every 2 weeks', monthly: 'Monthly' };
+function nextDue(from, repeat, anchorDay) {
+  const d = new Date(from + 'T12:00:00');
+  if (repeat === 'daily') d.setDate(d.getDate() + 1);
+  else if (repeat === 'weekdays') { do d.setDate(d.getDate() + 1); while (d.getDay() === 0 || d.getDay() === 6); }
+  else if (repeat === 'weekly') d.setDate(d.getDate() + 7);
+  else if (repeat === 'biweekly') d.setDate(d.getDate() + 14);
+  else if (repeat === 'monthly') { const day = anchorDay || d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + 1); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); }
+  return dateStr(d);
+}
 function toggleDone(group, taskId) {
   const t = findTask(group, taskId);
-  if (t) { const was = overdueOpenCount(); t.done = !t.done; todosSave(); eggHook('todoToggle', { was, now: overdueOpenCount() }); }
+  if (!t) return;
+  const was = overdueOpenCount(); t.done = !t.done;
+  if (t.repeat && REPEATS[t.repeat] !== undefined) {
+    const list = clientTodos(group);
+    if (t.done && !t.nextId) {
+      // Next one is due a step after this one's due date, or after today when it had none (never in the past).
+      const anchor = +(t.dueDate || todayStr()).slice(8);   // monthly: keep "the 31st" even after a short month
+      let due = nextDue(t.dueDate || todayStr(), t.repeat, anchor);
+      while (due <= todayStr() && t.dueDate) due = nextDue(due, t.repeat, anchor);
+      const next = { ...t, id: uid(), done: false, dueDate: due, nextId: undefined };
+      delete next.nextId;
+      t.nextId = next.id; list.push(next);
+      toast(`Next “${t.task}” is due ${fmtDay(due)}.`);
+    } else if (!t.done && t.nextId) {
+      // Remove the copy only if it's still untouched; if it was already completed, keep the link so re-checking this one can't add another.
+      const n = list.find(x => x.id === t.nextId);
+      if (n && !n.done) { list.splice(list.indexOf(n), 1); delete t.nextId; }
+      else if (!n) delete t.nextId;
+    }
+  }
+  todosSave(); eggHook('todoToggle', { was, now: overdueOpenCount() });
 }
 function updateTaskField(group, taskId, field, val) { const t = findTask(group, taskId); if (t) { t[field] = val; todosSave(); } }
 
@@ -1060,24 +1185,62 @@ function autoFillDescs(day) {
   day.clients.forEach(c => { if (!day.descManual[c]) day.descriptions[c] = generateDesc(c, day); });
 }
 
-// Uses config.burnRates — no hardcoded groups
+// Uses config.burnRates — no hardcoded groups.
+// hours = whole month; before = hours on days before today; today = hours logged today (used for pacing).
 function calcMonthlyHours() {
   const d = new Date(currentDate + 'T12:00:00');
-  const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-  const hours = config.burnRates.map(() => 0);
+  const prefix = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`, today = todayStr();
+  const hours = config.burnRates.map(() => 0), before = config.burnRates.map(() => 0), todayH = config.burnRates.map(() => 0);
   Object.keys(db).forEach(date => {
     if (!date.startsWith(prefix)) return;
     SLOTS.forEach(s => {
       const c = bClient(db[date].blocks[s.time]);
-      if (c) config.burnRates.forEach((r, i) => { if (r.clients.includes(c)) hours[i] += 0.25; });
+      if (c) config.burnRates.forEach((r, i) => {
+        if (!r.clients.includes(c)) return;
+        hours[i] += 0.25;
+        if (date < today) before[i] += 0.25; else if (date === today) todayH[i] += 0.25;
+      });
     });
   });
-  return config.burnRates.map((r, i) => ({ ...r, hours: hours[i] }));
+  return config.burnRates.map((r, i) => ({ ...r, hours: hours[i], before: before[i], today: todayH[i] }));
+}
+
+// Working days (Mon-Fri) in the viewed month, how many are finished (before today), and whether today is one.
+function monthWorkdays() {
+  const d = new Date(currentDate + 'T12:00:00'), y = d.getFullYear(), m = d.getMonth(), today = todayStr();
+  let total = 0, done = 0, todayWork = false;
+  for (let i = 1, n = new Date(y, m + 1, 0).getDate(); i <= n; i++) {
+    const dt = new Date(y, m, i, 12), wd = dt.getDay();
+    if (wd === 0 || wd === 6) continue;
+    total++;
+    const ds = dateStr(dt);
+    if (ds < today) done++; else if (ds === today) todayWork = true;
+  }
+  return { total, done, todayWork };
+}
+
+// How a group is doing against its monthly target, from the working days so far.
+function burnPacing(g, wd) {
+  const { hours, before, target } = g;
+  const expected = wd.total ? target * wd.done / wd.total : 0;
+  let projected = null;
+  if (wd.done > 0 && wd.total) {
+    const rate = before / wd.done, left = wd.total - wd.done - (wd.todayWork ? 1 : 0);
+    projected = hours + rate * Math.max(0, left) + (wd.todayWork ? Math.max(0, rate - g.today) : 0);
+  }
+  const diff = Math.round((before - expected) * 4) / 4;
+  let status = 'on';
+  if (hours > target) status = 'over';
+  else if (wd.done === 0) status = 'start';
+  else if (diff >= 1) status = 'ahead';
+  else if (diff <= -1) status = 'behind';
+  return { expected, projected, diff, status };
 }
 
 // ── Render: Tracker ──────────────────────────────────────────
 function renderAll() {
   const day = getDay(currentDate);
+  if (featHook('applyRecurring', day)) autoFillDescs(day);
   document.getElementById('dateInput').value = currentDate;
   document.getElementById('dayName').textContent = new Date(currentDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
   document.getElementById('todayBtn').classList.toggle('is-today', currentDate === todayStr());
@@ -1090,6 +1253,7 @@ function renderAll() {
   updateTotalDisplay(day);
   updateDayInfo();
   eggHook('render');
+  featHook('render', day);
 }
 
 function renderHead(day) {
@@ -1241,31 +1405,37 @@ function renderDescs(day) {
 function renderBurnRate() {
   const d = new Date(currentDate + 'T12:00:00');
   const monthName = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-  const daysInMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-  const monthPct = d.getDate() / daysInMonth;
-  const data = calcMonthlyHours();
+  const data = calcMonthlyHours(), wd = monthWorkdays();
   const section = document.getElementById('burnSection'); section.innerHTML = '';
   if (!data.length) return;
   const hdr = document.createElement('div'); hdr.className = 'burn-hdr';
-  hdr.innerHTML = `<strong>Monthly Burn Rate <em class="burn-hint"><i class="hint-mouse">· drag to reorder</i><i class="hint-touch">· press and hold to reorder</i></em></strong><span>${monthName}</span>`; section.appendChild(hdr);
+  hdr.innerHTML = `<strong>Monthly Burn Rate <em class="burn-hint"><i class="hint-mouse">· drag to reorder</i><i class="hint-touch">· press and hold to reorder</i></em></strong><span>${monthName} · ${wd.done} of ${wd.total} working days done</span>`; section.appendChild(hdr);
   const grid = document.createElement('div'); grid.className = 'burn-grid';
-  data.forEach(({ label, target, hours }, idx) => {
+  data.forEach((g, idx) => {
+    const { label, target, hours } = g;
+    const pc = burnPacing(g, wd);
     const fillPct = Math.min(100, (hours / target) * 100);
-    const isOver = hours > target;
-    const isWarn = !isOver && (hours / target) - monthPct < -0.15;
-    const paceDiff = Math.round((hours - target * monthPct) * 4) / 4;
-    const paceTxt = isOver ? 'over target' : Math.abs(paceDiff) < 1 ? 'on pace' : `${fmtHrs(Math.abs(paceDiff))}h ${paceDiff > 0 ? 'ahead of' : 'behind'} pace`;
+    const isOver = pc.status === 'over', isWarn = pc.status === 'behind';
+    const paceTxt = { over: 'over target', start: 'month just started', on: 'on pace', ahead: `${fmtHrs(Math.abs(pc.diff))}h ahead of pace`, behind: `${fmtHrs(Math.abs(pc.diff))}h behind pace` }[pc.status];
     const card = document.createElement('div'); card.className = 'burn-card'; card.tabIndex = 0;
     card.dataset.i = idx; card.dataset.name = label; card.title = `${label} — drag to reorder (keyboard: Alt+← / Alt+→)`;
     const lbl = document.createElement('div'); lbl.className = 'burn-card-label';
     lbl.innerHTML = `<strong>${esc(label)}</strong><span class="${isOver ? 'over' : ''}">${fmtHrs(hours)} / ${target} hrs</span>`;
     const track = document.createElement('div'); track.className = 'burn-track';
     const fill = document.createElement('div'); fill.className = 'burn-fill' + (fillPct >= 100 ? ' done' : isWarn ? ' warn' : ''); fill.style.width = `${fillPct}%`;
-    const pace = document.createElement('div'); pace.className = 'burn-pace'; pace.style.left = `${monthPct * 100}%`;
-    pace.title = `Even pace for this date: ${fmtHrs(Math.round(target * monthPct * 4) / 4)}h`;
+    const pace = document.createElement('div'); pace.className = 'burn-pace'; pace.style.left = `${wd.total ? Math.min(100, pc.expected / target * 100) : 0}%`;
+    pace.title = `Even pace after ${wd.done} working day${wd.done === 1 ? '' : 's'}: ${fmtHrs(Math.round(pc.expected * 4) / 4)}h`;
     track.appendChild(fill); track.appendChild(pace);
-    const pctEl = document.createElement('div'); pctEl.className = 'burn-pct' + (isWarn ? ' behind' : ''); pctEl.textContent = `${Math.round(fillPct)}% · ${paceTxt}`;
-    card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl); grid.appendChild(card);
+    const pctEl = document.createElement('div'); pctEl.className = 'burn-pct'; 
+    pctEl.innerHTML = `${Math.round(fillPct)}% · <b class="pace-chip pace-${pc.status}">${paceTxt}</b>`;
+    card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl);
+    if (pc.projected != null && pc.status !== 'over' && wd.done < wd.total) {
+      const pr = document.createElement('div'); pr.className = 'burn-proj';
+      const p = Math.round(pc.projected);
+      pr.textContent = `On track for ~${p}h by month end` + (p < target * 0.95 ? ` (${target - p}h short)` : p > target * 1.05 ? ` (${p - target}h over)` : '');
+      card.appendChild(pr);
+    }
+    grid.appendChild(card);
   });
   section.appendChild(grid);
   eggHook('burn');
@@ -1275,6 +1445,7 @@ function renderBurnRate() {
 function refreshCells(day) {
   decorateCells(day);
   renderFoot(day);
+  featHook('render', day);
 }
 
 function updateTotalDisplay(day) {
@@ -1741,8 +1912,8 @@ function renderTodoList(group) {
   } else {
     const table = document.createElement('table'); table.className = 'todo-table';
     const colHdr = multi
-      ? `<th style="width:28px"></th><th style="width:90px">${isAll ? 'Group' : 'Client'}</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`
-      : `<th style="width:28px"></th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th>Notes</th><th style="width:34px"></th>`;
+      ? `<th style="width:28px"></th><th style="width:90px">${isAll ? 'Group' : 'Client'}</th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th style="width:92px">Repeat</th><th>Notes</th><th style="width:34px"></th>`
+      : `<th style="width:28px"></th><th>Task</th><th style="width:72px">Priority</th><th style="width:115px">Due Date</th><th style="width:75px">Time</th><th style="width:92px">Repeat</th><th>Notes</th><th style="width:34px"></th>`;
     table.innerHTML = `<thead><tr>${colHdr}</tr></thead>`;
     const tBody = document.createElement('tbody');
 
@@ -1791,6 +1962,12 @@ function renderTodoList(group) {
       timeInp2.type = 'time'; timeInp2.className = 'todo-due-inp'; timeInp2.value = task.dueTime || '';
       timeInp2.onchange = () => updateTaskField(g, task.id, 'dueTime', timeInp2.value);
       tdTime2.appendChild(timeInp2); tr.appendChild(tdTime2);
+
+      const tdRep = document.createElement('td'); const repSel = document.createElement('select');
+      repSel.className = 'todo-repeat-sel'; repSel.title = 'Repeat: when you complete it, the next one appears';
+      Object.entries(REPEATS).forEach(([v, l]) => repSel.appendChild(Object.assign(document.createElement('option'), { value: v, textContent: v ? '↻ ' + l : '—', selected: (task.repeat || '') === v })));
+      repSel.onchange = () => updateTaskField(g, task.id, 'repeat', repSel.value);
+      tdRep.appendChild(repSel); tr.appendChild(tdRep);
 
       const tdNotes = document.createElement('td'); const notesInp = document.createElement('input');
       notesInp.type = 'text'; notesInp.className = 'todo-notes-inp'; notesInp.value = task.notes || '';
@@ -1847,6 +2024,8 @@ function renderTodoList(group) {
     };
     dateWrap.appendChild(dateInp); dateWrap.appendChild(pickBtn); dateWrap.appendChild(pickInp); dateWrap.appendChild(dateHint);
     const timeInp = document.createElement('input'); timeInp.type = 'time'; timeInp.className = 'add-date-inp';
+    const repInp = document.createElement('select'); repInp.className = 'add-date-inp'; repInp.title = 'Repeat';
+    Object.entries(REPEATS).forEach(([v, l]) => repInp.appendChild(Object.assign(document.createElement('option'), { value: v, textContent: v ? '↻ ' + l : '↻ No repeat' })));
     const addBtn = document.createElement('button'); addBtn.className = 'add-task-btn'; addBtn.textContent = '+ Add';
     // A group can span several client lists; pick which one the new task goes in.
     let listSel = null;
@@ -1858,13 +2037,13 @@ function renderTodoList(group) {
       const text = taskInp.value.trim(); if (!text) { taskInp.focus(); return; }
       const due = showDue();
       if (due === null) { dateInp.focus(); dateInp.select(); return; }
-      addTask(listSel ? listSel.value : sec.keys[0], text, due, timeInp.value);
+      addTask(listSel ? listSel.value : sec.keys[0], text, due, timeInp.value, repInp.value);
       renderTodosTab(); renderBody(getDay(currentDate));
       document.querySelector('#todoContent .add-task-inp')?.focus();
     };
     taskInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
     dateInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
-    addRow.appendChild(taskInp); if (listSel) addRow.appendChild(listSel); addRow.appendChild(dateWrap); addRow.appendChild(timeInp); addRow.appendChild(addBtn);
+    addRow.appendChild(taskInp); if (listSel) addRow.appendChild(listSel); addRow.appendChild(dateWrap); addRow.appendChild(timeInp); addRow.appendChild(repInp); addRow.appendChild(addBtn);
     container.appendChild(addRow);
   }
 }
@@ -1963,6 +2142,7 @@ function renderSettings() {
   renderSettingsClients();
   renderSettingsBurnRates();
   renderSyncPanel();
+  featHook('settings');
 }
 
 function renderSettingsClients() {
@@ -2204,7 +2384,7 @@ function syncCfgLoad() {
     if (s) { syncCfg.token = s.token || ''; syncCfg.gistId = s.gistId || ''; syncCfg.lastSync = s.lastSync || ''; syncCfg.autoSync = s.autoSync !== false; }
   } catch {}
 }
-function syncCfgSave() { lsSet(SYNC_STORE_KEY, JSON.stringify(syncCfg)); }
+function syncCfgSave() { lsSet(SYNC_STORE_KEY, JSON.stringify(syncCfg)); if (syncBooted) renderSyncBadge(); }
 
 const GIST_FILENAME = 'sam-time-tracker.json';
 const BACKUP_KEY = 'stt_backup';
@@ -2231,6 +2411,7 @@ function dataSize(d) {
 const localSize = () => dataSize({ stt_v1: db, stt_todos: todos });
 
 function saveBackup(reason) {
+  featHook('snapshot', reason);
   try { lsSet(BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), reason, data: packAllData() })); }
   catch (e) { console.warn('Backup not saved', e); }
 }
@@ -2247,6 +2428,7 @@ function unpackAllData(json) {
   lsSet('stt_lastChange', stamp);
   syncCfg.lastSync = stamp;
   syncCfgSave();
+  undoReset();   // the data was replaced wholesale; older undo steps no longer apply
 }
 
 function gistHeaders(json) {
@@ -2316,18 +2498,32 @@ async function gistPull() {
   } catch (e) { setSyncState('error', e.message); throw e; }
 }
 
-// Status chip in the header
+// Status badge in the header (always visible): synced / saving / syncing / offline / failed / local only
+let syncPhase = 'idle';   // idle | pending | syncing | error
 function setSyncState(state, msg = '') {
-  const el = document.getElementById('syncIndicator');
   syncError = state === 'error' ? msg : '';
-  if (!el) return;
-  clearTimeout(el._t);
-  if (state === 'syncing') { el.textContent = 'Syncing…'; el.className = 'show'; el.title = ''; return; }
-  if (state === 'pending') { el.textContent = 'Saving…'; el.className = 'show'; el.title = ''; return; }
-  if (state === 'error') { el.textContent = '⚠ Sync failed'; el.className = 'sync-err show'; el.title = msg; return; }
-  el.textContent = msg || 'Up to date'; el.className = 'show'; el.title = '';
-  el._t = setTimeout(() => { el.className = ''; }, 4000);
+  syncPhase = state === 'syncing' ? 'syncing' : state === 'pending' ? 'pending' : state === 'error' ? 'error' : 'idle';
+  renderSyncBadge();
 }
+function renderSyncBadge() {
+  const el = document.getElementById('syncIndicator'); if (!el) return;
+  let st, txt, title;
+  if (!syncCfg.token || !syncCfg.gistId) { st = 'local'; txt = 'Local only'; title = 'Not syncing to other devices. Click to set up sync in Settings.'; }
+  else if (!syncCfg.autoSync) { st = 'local'; txt = 'Sync off'; title = 'Auto-sync is off. Click to sync now.'; }
+  else if (syncPhase === 'error') { st = 'error'; txt = 'Sync failed'; title = syncError || 'Sync failed'; }
+  else if (syncPhase === 'syncing') { st = 'syncing'; txt = 'Syncing…'; title = 'Talking to GitHub…'; }
+  else if (navigator.onLine === false) { st = 'offline'; txt = hasUnsynced() ? 'Offline · unsynced' : 'Offline'; title = hasUnsynced() ? 'No connection. Your latest edits are saved here and will upload when you are back online.' : 'No connection.'; }
+  else if (syncPhase === 'pending' || hasUnsynced()) { st = 'pending'; txt = 'Saving…'; title = 'Your latest edits will upload in a moment.'; }
+  else { st = 'ok'; txt = 'Synced'; title = syncCfg.lastSync ? `All devices up to date (last sync ${new Date(syncCfg.lastSync).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}). Click to check now.` : 'Up to date. Click to check now.'; }
+  el.className = 'st-' + st;
+  el.querySelector('.sync-txt').textContent = txt;
+  el.title = title; el.setAttribute('aria-label', 'Sync status: ' + txt);
+}
+document.getElementById('syncIndicator').onclick = () => {
+  if (!syncCfg.token || !syncCfg.gistId) { showTab('settings'); return; }
+  autoSync({ manual: true }).then(() => toast('Checked: up to date.')).catch(e => toast(e.message));
+};
+window.addEventListener('online', renderSyncBadge); window.addEventListener('offline', renderSyncBadge);
 
 // Compare with the Gist and move data in whichever direction is needed.
 async function autoSync({ manual = false } = {}) {
@@ -2418,7 +2614,7 @@ function restoreBackup() {
   db = d.stt_v1 || {}; todos = d.stt_todos || {}; customTasks = d.stt_custom || {};
   if (d.stt_config?.defaultClients) config = d.stt_config;
   dbSave(false); todosSave(false); customSave(false); configSave(false);
-  markLocalChange();
+  markLocalChange(); undoReset();
   refreshVisible();
 }
 
@@ -2817,7 +3013,7 @@ document.getElementById('descRows').addEventListener('click', e => {
   }
 });
 
-const TABS = ['home', 'tracker', 'todos', 'settings'];
+const TABS = ['home', 'tracker', 'summary', 'todos', 'settings'];
 function activeTab() { return document.querySelector('.app-tab-btn.active')?.dataset.tab; }
 
 function showTab(tab) {
@@ -2827,7 +3023,9 @@ function showTab(tab) {
   if (tab === 'home') renderHomeTab();
   if (tab === 'todos') renderTodosTab();
   if (tab === 'settings') renderSettings();
+  if (tab === 'summary') featHook('summary');
   if (tab === 'tracker') markNow();
+  featHook('tabChanged', tab);
   lsSet('stt_tab', tab);
 }
 
@@ -2838,6 +3036,7 @@ function refreshVisible() {
   if (tab === 'home') renderHomeTab();
   if (tab === 'todos') renderTodosTab();
   if (tab === 'settings') renderSettings();
+  if (tab === 'summary') featHook('summary');
 }
 
 document.getElementById('appTabBar').addEventListener('click', e => {
@@ -2992,7 +3191,9 @@ document.getElementById('applyClientsToAllBtn').onclick = () => {
 
 document.getElementById('resetConfigBtn').onclick = () => {
   if (!confirm('Reset to original default clients and burn rate groups?\n\nYour tracked time data will not be affected.')) return;
+  const keepRecurring = config.recurring;
   config = buildDefaultConfig();
+  if (keepRecurring) config.recurring = keepRecurring;   // these aren't part of "original defaults"
   configSave();
   renderSettings();
   renderBurnRate();
@@ -3046,14 +3247,17 @@ showNextQuote(true);
 setInterval(() => showNextQuote(false), 12000);
 
 // ── Init ─────────────────────────────────────────────────────
-dbLoad(); todosLoad(); customLoad(); syncCfgLoad(); configLoad(); rangeLoad(); renderAll();
+dbLoad(); todosLoad(); customLoad(); syncCfgLoad(); configLoad(); rangeLoad(); undoReset(); renderAll();
 const savedTab = localStorage.getItem('stt_tab');
 if (TABS.includes(savedTab) && savedTab !== 'tracker') showTab(savedTab);
 scrollToNow();
 syncBooted = true;
+renderSyncBadge();
+setInterval(renderSyncBadge, 60000);
 autoSync();
 </script>
 <script src="easter-eggs.js" defer></script>
+<script src="features.js" defer></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));

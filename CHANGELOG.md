@@ -5,9 +5,37 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-- **2026-10-26: The red line now starts at the arrow.** The time tag's arrow ended inside the time column while the line only began at the column's edge, leaving a gap. A short red stem now runs from the arrow tip across the time column, so the line looks continuous from the arrow onward (desktop and phone).
+- **2026-10-28: Bug check of the new features and the rest of the app.** Fixed:
+  - *Undo merged separate actions.* An edit made right after pressing Undo joined the older step, and quick actions on different things (e.g. adding a recurring block, then applying it) became one step. Steps now only combine for the same kind of edit in quick succession (typing).
+  - *Gaps list missed a gap at the very end* (e.g. 10:30 to 11:30 before your last entry).
+  - *Phone: the Sums row fell below the screen* because the controls grew a second row. The grid now measures the controls (and the gaps strip) so it always fits.
+  - *Phone: Home tab was wider than the screen* (a pre-existing problem with long task names). It is now one column.
+  - *Phone: reminders covered the buttons.* They are now a banner under the tabs; on wider screens they stay in the top-right corner.
+  - *Recurring blocks:* a new rule no longer fills today's grid while you are still setting it up (it applies when you go back to the tracker); "Reset to Defaults" no longer deletes your recurring blocks; damaged rule data can no longer crash the app.
+  - *Recurring to-dos:* un-checking and re-checking after the next copy was already completed no longer adds a duplicate; monthly tasks keep their day of the month ("the 31st") after a short month; damaged data can't crash.
+  - *Storage full:* the automatic backups give up space first (oldest first) so your edits still save; backups are capped lower (about 1.8 MB) so they can't crowd out your data.
+  - *Timer:* a clock that jumps backwards logs nothing instead of a stray slot; no crash with an empty day; Summary opens on the current week/month again after you move days on the tracker.
+  - *Burn-rate:* finished months no longer show a month-end projection.
+  - *Dark mode:* fixed a few inline-styled labels and buttons that stayed light.
+  - *Notifications:* the "Allow notifications" button works in older Safari.
+
+- **2026-10-28: Twelve new features** (new files `features.js`, `features.css`, `dark.css`; if `features.js` ever fails to load, the app works as before).
+  - *Recurring time blocks* (Settings): e.g. "Standup, 9:00 to 9:15, Mon to Fri". The first time you open a matching day, its empty slots fill in. Change or delete them and they stay changed. Only affects days from the day you create the rule. There is an "Apply to the day shown now" button too. Opening a day this way is not counted as an edit, so a stale device can't overwrite your synced copy.
+  - *Fill gaps*: a "gaps" button in the controls bar counts unlogged slots between your first and last entry. It highlights them with stripes and lists each gap ("9:45 to 10:30 AM, 0.75 h") with a + to fill it, or "Fill all gaps" with a client you choose.
+  - *Timer*: "Start timer" picks a client (and task); Stop logs it in 15-minute slots rounded to the nearest slot (10:07 to 10:54 logs 10:00 to 11:00). It keeps running if you close the page, shows in the browser tab title, and a red pill follows you to the other tabs. Stop is undoable.
+  - *Undo and redo for everything*: Undo/Redo buttons plus Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z cover time entries, to-dos, saved tasks and settings (the last 40 changes; quick bursts of edits count as one step).
+  - *Summary tab*: week or month grid of hours per client per day with totals (click a day to open it), a donut chart of the client split, bars per day (week) or per week (month), and burn-group totals.
+  - *Burn-rate pacing*: each box now says "on pace / ahead / behind" by working days (Mon to Fri, not calendar days) and projects the month end ("On track for ~72h by month end (3h short)").
+  - *Automatic backups* (Settings): one backup a day on this device plus one before synced data replaces yours; the last 10 are kept, with a Restore button (your current data is backed up first). "Back up now" too.
+  - *Sync badge*: always visible in the top right of the header: Synced / Saving / Syncing / Offline (with "unsynced" if edits are waiting) / Sync failed / Local only. Click it to sync now (or open Settings if sync isn't set up). Phones show just the colored dot.
+  - *Recurring to-dos*: a Repeat setting (daily, weekdays, weekly, every 2 weeks, monthly) on every to-do. Completing one creates the next with the following due date; un-checking removes that copy again.
+  - *Reminders* (Settings): an in-app card when a to-do's time arrives, a morning summary for to-dos due today without a time, and a weekday reminder at 4:30 PM if you've logged under 6 hours (times and amount adjustable). Turn on notifications to also get them from other tabs and windows. Only works while the app is open (iPhone is limited to Home Screen apps).
+  - *Dark mode* (Settings > Appearance): Auto (follows your device), Light or Dark.
 
 ## Published
+
+### 2026-10-26: PR #7
+- **2026-10-26: The red line now starts at the arrow.** The time tag's arrow ended inside the time column while the line only began at the column's edge, leaving a gap. A short red stem now runs from the arrow tip across the time column, so the line looks continuous from the arrow onward (desktop and phone).
 
 ### 2026-10-26: PR #6
 - **2026-10-26: Fixed two bugs from the easter eggs update.**

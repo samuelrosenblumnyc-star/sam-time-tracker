@@ -95,7 +95,7 @@ html[data-theme="dark"] .pill-count { background: #2f3b4d; color: #cbd5e1; }
 html[data-theme="dark"] #todoContent { background: #161d27; }
 html[data-theme="dark"] #todoContent h3 { color: #9cc4f5; }
 html[data-theme="dark"] .todo-subtitle { color: #8b98aa; }
-html[data-theme="dark"] .todo-table th { color: #9aa7b8; border-bottom-color: #2a3544; }
+html[data-theme="dark"] .todo-table th { color: #dbe6f3; border-bottom-color: #2a3544; }
 html[data-theme="dark"] .todo-table td { border-bottom-color: #232d3a; }
 html[data-theme="dark"] .todo-task-inp:focus, html[data-theme="dark"] .todo-due-inp:focus, html[data-theme="dark"] .todo-priority-sel:focus, html[data-theme="dark"] .todo-repeat-sel:focus { outline-color: #2f5d94; border-color: #2f5d94; }
 html[data-theme="dark"] .todo-notes-inp:focus { background: #182436; border-color: #2f5d94; }
@@ -160,3 +160,4 @@ html[data-theme="dark"] [style*="color: rgb(85, 85, 85)"], html[data-theme="dark
 html[data-theme="dark"] [style*="color:#555"], html[data-theme="dark"] [style*="color:#666"], html[data-theme="dark"] [style*="color:#888"] { color: #aeb9c8 !important; }
 html[data-theme="dark"] #taskPopover button[style*="rgb(243, 244, 246)"], html[data-theme="dark"] #taskPopover button[style*="f3f4f6"] { background: #2a3647 !important; border-color: #3a4658 !important; color: #e5e9f0 !important; }
 html[data-theme="dark"] #settingsSection [style*="rgb(240, 240, 240)"], html[data-theme="dark"] #settingsSection [style*="#f0f0f0"] { border-top-color: #2a3544 !important; }
+html[data-theme="dark"] .add-task-row { border-bottom-color: #2a3544; }

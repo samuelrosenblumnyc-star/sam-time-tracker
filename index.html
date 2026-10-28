@@ -354,7 +354,7 @@
   #todoContent h3 { font-size: 14px; color: #1b3a5c; margin-bottom: 4px; }
   .todo-subtitle { font-size: 11px; color: #999; margin-bottom: 12px; }
   .todo-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-  .todo-table th { text-align: left; font-size: 11px; color: #666; border-bottom: 2px solid #eee; padding: 4px 8px; font-weight: bold; }
+  .todo-table th { text-align: left; font-size: 11px; color: #dbe6f3; border-bottom: 2px solid #eee; padding: 4px 8px; font-weight: bold; }
   .todo-table td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
   .todo-table tr.done-row td { opacity: .5; }
   .done-check { width: 15px; height: 15px; cursor: pointer; accent-color: #2563eb; }
@@ -369,7 +369,7 @@
   .todo-notes-inp { font-size: 12px; border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 2px 4px; font-family: inherit; width: 100%; min-width: 120px; color: inherit; }
   .todo-notes-inp:focus { outline: none; border-color: #bfdbfe; background: #f8fbff; }
   .done-row .todo-notes-inp { text-decoration: line-through; }
-  .add-task-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; padding-bottom: 12px; }
+  .add-task-row { display: flex; gap: 8px; align-items: center; margin: 4px 0 14px; padding-bottom: 14px; border-bottom: 1px solid #eee; }
   .add-task-inp { flex: 1; border: 1px solid #ddd; border-radius: 4px; padding: 6px 10px; font-size: 13px; font-family: inherit; }
   .add-task-inp:focus { outline: none; border-color: #2563eb; }
   .add-date-inp { border: 1px solid #ddd; border-radius: 4px; padding: 6px 8px; font-size: 12px; font-family: inherit; }
@@ -2044,7 +2044,7 @@ function renderTodoList(group) {
     taskInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
     dateInp.onkeydown = e => { if (e.key === 'Enter') addBtn.click(); };
     addRow.appendChild(taskInp); if (listSel) addRow.appendChild(listSel); addRow.appendChild(dateWrap); addRow.appendChild(timeInp); addRow.appendChild(repInp); addRow.appendChild(addBtn);
-    container.appendChild(addRow);
+    container.insertBefore(addRow, sortBar);   // at the top, so adding a task never needs a scroll to the bottom
   }
 }
 

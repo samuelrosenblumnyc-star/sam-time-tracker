@@ -5,9 +5,12 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-- **2026-10-28: On/off switch for automatic backups, per device** (Settings > Automatic Backups > "Keep automatic backups on this device"). It's stored only on that device, so you can have backups on for your laptop and off for your phone. While off, no daily backups and none before synced data replaces yours; "Back up now", the safety copy before a restore, and restoring older backups all still work. A new "Delete backups on this device" button clears them (your real data is not touched). Turning it back on takes a backup straight away. Bug-tested with sync pulls while off, odd stored values, phone and dark mode. Also tidied the "remind me if I've logged under N hours" sentence in Settings so it reads properly on phones.
+(nothing right now)
 
 ## Published
+
+### 2026-10-28: PR #10
+- **2026-10-28: On/off switch for automatic backups, per device** (Settings > Automatic Backups > "Keep automatic backups on this device"). It's stored only on that device, so you can have backups on for your laptop and off for your phone. While off, no daily backups and none before synced data replaces yours; "Back up now", the safety copy before a restore, and restoring older backups all still work. A new "Delete backups on this device" button clears them (your real data is not touched). Turning it back on takes a backup straight away. Bug-tested with sync pulls while off, odd stored values, phone and dark mode. Also tidied the "remind me if I've logged under N hours" sentence in Settings so it reads properly on phones.
 
 ### 2026-10-28: PR #9
 - **2026-10-28: The "add a to-do" row is now at the top of the list** (just under the client name), so you never scroll to the bottom to add one. It keeps focus after you add so you can type the next one. Also made the to-do table's column headings (Task, Priority, Due Date...) readable; they were gray on dark blue.

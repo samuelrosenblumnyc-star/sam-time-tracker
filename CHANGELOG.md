@@ -5,9 +5,12 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-- **2026-10-28: The "add a to-do" row is now at the top of the list** (just under the client name), so you never scroll to the bottom to add one. It keeps focus after you add so you can type the next one. Also made the to-do table's column headings (Task, Priority, Due Date...) readable; they were gray on dark blue.
+(nothing right now)
 
 ## Published
+
+### 2026-10-28: PR #9
+- **2026-10-28: The "add a to-do" row is now at the top of the list** (just under the client name), so you never scroll to the bottom to add one. It keeps focus after you add so you can type the next one. Also made the to-do table's column headings (Task, Priority, Due Date...) readable; they were gray on dark blue.
 
 ### 2026-10-28: PR #8
 - **2026-10-28: Bug check of the new features and the rest of the app.** Fixed:

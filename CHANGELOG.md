@@ -5,6 +5,20 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
+- **2026-10-28: Bug check of the new features and the rest of the app.** Fixed:
+  - *Undo merged separate actions.* An edit made right after pressing Undo joined the older step, and quick actions on different things (e.g. adding a recurring block, then applying it) became one step. Steps now only combine for the same kind of edit in quick succession (typing).
+  - *Gaps list missed a gap at the very end* (e.g. 10:30 to 11:30 before your last entry).
+  - *Phone: the Sums row fell below the screen* because the controls grew a second row. The grid now measures the controls (and the gaps strip) so it always fits.
+  - *Phone: Home tab was wider than the screen* (a pre-existing problem with long task names). It is now one column.
+  - *Phone: reminders covered the buttons.* They are now a banner under the tabs; on wider screens they stay in the top-right corner.
+  - *Recurring blocks:* a new rule no longer fills today's grid while you are still setting it up (it applies when you go back to the tracker); "Reset to Defaults" no longer deletes your recurring blocks; damaged rule data can no longer crash the app.
+  - *Recurring to-dos:* un-checking and re-checking after the next copy was already completed no longer adds a duplicate; monthly tasks keep their day of the month ("the 31st") after a short month; damaged data can't crash.
+  - *Storage full:* the automatic backups give up space first (oldest first) so your edits still save; backups are capped lower (about 1.8 MB) so they can't crowd out your data.
+  - *Timer:* a clock that jumps backwards logs nothing instead of a stray slot; no crash with an empty day; Summary opens on the current week/month again after you move days on the tracker.
+  - *Burn-rate:* finished months no longer show a month-end projection.
+  - *Dark mode:* fixed a few inline-styled labels and buttons that stayed light.
+  - *Notifications:* the "Allow notifications" button works in older Safari.
+
 - **2026-10-28: Twelve new features** (new files `features.js`, `features.css`, `dark.css`; if `features.js` ever fails to load, the app works as before).
   - *Recurring time blocks* (Settings): e.g. "Standup, 9:00 to 9:15, Mon to Fri". The first time you open a matching day, its empty slots fill in. Change or delete them and they stay changed. Only affects days from the day you create the rule. There is an "Apply to the day shown now" button too. Opening a day this way is not counted as an edit, so a stale device can't overwrite your synced copy.
   - *Fill gaps*: a "gaps" button in the controls bar counts unlogged slots between your first and last entry. It highlights them with stripes and lists each gap ("9:45 to 10:30 AM, 0.75 h") with a + to fill it, or "Fill all gaps" with a client you choose.

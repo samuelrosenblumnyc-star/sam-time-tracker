@@ -130,6 +130,9 @@ table.sum-grid { border-collapse: separate; border-spacing: 0; font-size: 12px; 
   .ft-tools .ctrl-lbl { display: none; }
   .ft-pop { position: fixed; left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-width: none; z-index: 700; }
   #gapStrip { padding: 8px 10px; }
-  #remindStack { right: 8px; left: 8px; width: auto; }
+  /* on phones the reminder is a banner in the page, under the tabs, so it never covers a button */
+  #remindStack { position: static; width: auto; padding: 0 8px; pointer-events: auto; gap: 6px; }
+  #remindStack:not(:empty) { padding: 8px; }
+  .remind-card { box-shadow: none; }
   .rec-rule { padding: 8px; }
 }

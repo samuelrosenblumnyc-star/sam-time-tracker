@@ -155,3 +155,8 @@ html[data-theme="dark"] .bar-stack { background: #222b38; }
 html[data-theme="dark"] .rec-days button.on { color: #fff; }
 html[data-theme="dark"] #funPanel label { color: #d6dde8 !important; }
 html[data-theme="dark"] #funPanel input { accent-color: #7fb0e6 !important; }
+/* inline-styled bits in the main script (browsers rewrite hex colours in style attributes as rgb(...)) */
+html[data-theme="dark"] [style*="color: rgb(85, 85, 85)"], html[data-theme="dark"] [style*="color: rgb(102, 102, 102)"], html[data-theme="dark"] [style*="color: rgb(136, 136, 136)"],
+html[data-theme="dark"] [style*="color:#555"], html[data-theme="dark"] [style*="color:#666"], html[data-theme="dark"] [style*="color:#888"] { color: #aeb9c8 !important; }
+html[data-theme="dark"] #taskPopover button[style*="rgb(243, 244, 246)"], html[data-theme="dark"] #taskPopover button[style*="f3f4f6"] { background: #2a3647 !important; border-color: #3a4658 !important; color: #e5e9f0 !important; }
+html[data-theme="dark"] #settingsSection [style*="rgb(240, 240, 240)"], html[data-theme="dark"] #settingsSection [style*="#f0f0f0"] { border-top-color: #2a3544 !important; }

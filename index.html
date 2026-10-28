@@ -133,7 +133,7 @@
   .jump-link:hover { background: #eff6ff; }
 
   /* ── Grid ── */
-  #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 80px); background: #fff; }
+  #tableWrap { overflow: auto; max-height: calc(100vh - var(--top-h) - 40px - var(--ctl-h, 40px)); background: #fff; }
   #tableWrap table { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; min-width: calc(160px + var(--cols, 8) * 64px); }
 
   thead th {
@@ -543,6 +543,11 @@
     tfoot td { padding: 4px 2px; font-size: 10px; }
     tfoot td:first-child { padding-right: 5px; }
 
+    /* Home: one column (two long, non-wrapping panels pushed the page wider than the screen) */
+    #homeSection { padding: 10px; }
+    .home-grid { grid-template-columns: minmax(0, 1fr); }
+    .home-panel { min-width: 0; }
+
     /* Descriptions */
     #descSection { padding: 10px; }
     .desc-row { flex-direction: column; gap: 5px; }
@@ -811,8 +816,10 @@ let config = { defaultClients: [], burnRates: [] };
 // it has the right shape before the app touches it. These repair in place.
 // Writes can fail (storage full, private mode); say so instead of silently losing the edit.
 function lsSet(k, v) {
-  try { localStorage.setItem(k, v); }
-  catch (e) { console.warn('save failed', k, e); if (typeof toast === 'function') toast("Couldn't save to this browser (storage full or blocked)."); }
+  try { localStorage.setItem(k, v); return; } catch (e) { var err = e; }
+  // Storage full: the automatic backups are the first thing to give up space (oldest first), then retry.
+  try { while (featHook('freeSpace')) { try { localStorage.setItem(k, v); return; } catch { /* still full */ } } } catch { /* ignore */ }
+  console.warn('save failed', k, err); if (typeof toast === 'function') toast("Couldn't save to this browser (storage full or blocked).");
 }
 const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
 function cleanConfig(c) {
@@ -822,7 +829,10 @@ function cleanConfig(c) {
   c.burnRates.forEach(b => { if (!Array.isArray(b.clients)) b.clients = []; });
   if (!isObj(c.clientColors)) delete c.clientColors;
   if (!Array.isArray(c.recurring)) delete c.recurring;
-  else c.recurring = c.recurring.filter(r => isObj(r) && r.id && typeof r.client === 'string' && /^\d\d:\d\d$/.test(r.start) && /^\d\d:\d\d$/.test(r.end));
+  else {
+    c.recurring = c.recurring.filter(r => isObj(r) && r.id && typeof r.client === 'string' && /^\d\d:\d\d$/.test(r.start) && /^\d\d:\d\d$/.test(r.end));
+    c.recurring.forEach(r => { r.days = Array.isArray(r.days) ? r.days.filter(d => Number.isInteger(d) && d >= 0 && d <= 6) : []; });
+  }
   return true;
 }
 function cleanDb(d) {
@@ -844,6 +854,7 @@ function cleanDb(d) {
     });
     if (!isObj(day.descriptions)) day.descriptions = {};
     if (!isObj(day.descManual)) day.descManual = {};
+    if (!Array.isArray(day.rec)) delete day.rec;
   });
   return d;
 }
@@ -889,13 +900,13 @@ function undoNote(store, str, mark) {
   u.snap[store] = str;
   if (u.applying || !mark || prev === undefined || prev === str) return;
   const before = { ...u.snap, [store]: prev }, now = Date.now(), last = u.undo[u.undo.length - 1];
-  if (last && now - u.t < 1200) { if (!last.what.includes(store)) last.what.push(store); }
+  if (last && now - u.t < 700 && last.what.length === 1 && last.what[0] === store) { /* same kind of edit in quick succession (typing): one step */ }
   else { u.undo.push({ state: before, what: [store] }); if (u.undo.length > UNDO_MAX) u.undo.shift(); }
   u.t = now; u.redo.length = 0;
   featHook('undoChanged');
 }
 function undoReset() {
-  const u = undoState; u.undo.length = 0; u.redo.length = 0;
+  const u = undoState; u.undo.length = 0; u.redo.length = 0; u.t = 0;
   u.snap = { db: JSON.stringify(db), todos: JSON.stringify(todos), custom: JSON.stringify(customTasks), config: JSON.stringify(config) };
   featHook('undoChanged');
 }
@@ -905,7 +916,7 @@ function undoStep(dir) {
   const e = from.pop();
   if (!e) { toast(dir === 'undo' ? 'Nothing to undo.' : 'Nothing to redo.'); return false; }
   const current = { ...u.snap };
-  u.applying = true;
+  u.applying = true; u.t = 0;
   try {
     e.what.forEach(k => {
       const str = e.state[k]; if (str === undefined || str === current[k]) return;
@@ -1041,9 +1052,10 @@ function toggleDone(group, taskId) {
       t.nextId = next.id; list.push(next);
       toast(`Next “${t.task}” is due ${fmtDay(due)}.`);
     } else if (!t.done && t.nextId) {
+      // Remove the copy only if it's still untouched; if it was already completed, keep the link so re-checking this one can't add another.
       const n = list.find(x => x.id === t.nextId);
-      if (n && !n.done) list.splice(list.indexOf(n), 1);
-      delete t.nextId;
+      if (n && !n.done) { list.splice(list.indexOf(n), 1); delete t.nextId; }
+      else if (!n) delete t.nextId;
     }
   }
   todosSave(); eggHook('todoToggle', { was, now: overdueOpenCount() });
@@ -1417,7 +1429,7 @@ function renderBurnRate() {
     const pctEl = document.createElement('div'); pctEl.className = 'burn-pct'; 
     pctEl.innerHTML = `${Math.round(fillPct)}% · <b class="pace-chip pace-${pc.status}">${paceTxt}</b>`;
     card.appendChild(lbl); card.appendChild(track); card.appendChild(pctEl);
-    if (pc.projected != null && pc.status !== 'over') {
+    if (pc.projected != null && pc.status !== 'over' && wd.done < wd.total) {
       const pr = document.createElement('div'); pr.className = 'burn-proj';
       const p = Math.round(pc.projected);
       pr.textContent = `On track for ~${p}h by month end` + (p < target * 0.95 ? ` (${target - p}h short)` : p > target * 1.05 ? ` (${p - target}h over)` : '');
@@ -3179,7 +3191,9 @@ document.getElementById('applyClientsToAllBtn').onclick = () => {
 
 document.getElementById('resetConfigBtn').onclick = () => {
   if (!confirm('Reset to original default clients and burn rate groups?\n\nYour tracked time data will not be affected.')) return;
+  const keepRecurring = config.recurring;
   config = buildDefaultConfig();
+  if (keepRecurring) config.recurring = keepRecurring;   // these aren't part of "original defaults"
   configSave();
   renderSettings();
   renderBurnRate();

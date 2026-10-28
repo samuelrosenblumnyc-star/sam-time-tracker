@@ -50,6 +50,11 @@
   const gapStrip = el('div', { id: 'gapStrip', hidden: true });
   $('controls').after(gapStrip);
 
+  // The grid is as tall as the screen allows; tell the CSS how tall the controls (plus the gaps strip) are, so the Sums row never falls below the fold
+  const syncCtlH = () => document.documentElement.style.setProperty('--ctl-h', ($('controls').offsetHeight + (gapStrip.hidden ? 0 : gapStrip.offsetHeight)) + 'px');
+  if (window.ResizeObserver) { const ro = new ResizeObserver(syncCtlH); ro.observe($('controls')); ro.observe(gapStrip); }
+  syncCtlH();
+
   FEAT.undoChanged = () => {
     undoBtn.disabled = !undoState.undo.length; redoBtn.disabled = !undoState.redo.length;
   };
@@ -135,6 +140,7 @@
     const refresh = keep => fillSelect(tSel, taskOptions(cSel.value), keep);
     refresh(last && last.client === cSel.value ? joinTask(last.taskId, last.otherText) : '');
     cSel.onchange = () => refresh();
+    if (!clients.length) { toast('Add a client to this day first.'); return; }
     timerPanel.replaceChildren(
       el('label', null, 'Client', cSel), el('label', null, 'Task (optional)', tSel),
       el('button', { class: 'ctrl-btn primary', text: '▶ Start', onclick: () => { const { taskId, otherText } = splitTask(tSel.value); startTimer(cSel.value, taskId, otherText); } }),
@@ -155,6 +161,7 @@
     if (discard) { toast('Timer discarded.'); return; }
     const end = Date.now(), s = new Date(t.start), e = new Date(end);
     if (end - t.start > 36 * 3600000) { toast('That timer ran over 36 hours, so it was not logged.'); return; }
+    if (end < t.start) { toast('The clock went backwards, so that timer was not logged.'); return; }
     const plan = [];   // [date, startMin, endMin]
     let d = dateStr(s);
     const sm = s.getHours() * 60 + s.getMinutes(), em = e.getHours() * 60 + e.getMinutes();
@@ -217,23 +224,26 @@
     if (changed) { autoFillDescs(day); dbSave(); refreshVisible(); toast('Recurring blocks applied to empty slots.'); } else toast('Nothing to add: those slots are already filled (or no rule matches this day).');
   }
 
+  // Rule edits take effect when you go back to the tracker (so a half-set-up rule never fills today's grid while you're still typing it)
+  let rulesDirty = false;
+  const saveRules = () => { rulesDirty = true; configSave(); };
   function renderRecurringPanel() {
     const panel = $('recPanel'); if (!panel) return;
     const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     const list = el('div');
     rules().forEach(r => {
       const bad = toMin(r.end) <= toMin(r.start);
-      const name = el('input', { type: 'text', class: 'rec-name', value: r.label || '', placeholder: 'Name (e.g. Standup)', onchange: e => { r.label = e.target.value.trim(); configSave(); } });
-      const cSel = el('select', { onchange: e => { r.client = e.target.value; r.taskId = null; r.otherText = ''; configSave(); renderRecurringPanel(); } });
+      const name = el('input', { type: 'text', class: 'rec-name', value: r.label || '', placeholder: 'Name (e.g. Standup)', onchange: e => { r.label = e.target.value.trim(); saveRules(); } });
+      const cSel = el('select', { onchange: e => { r.client = e.target.value; r.taskId = null; r.otherText = ''; saveRules(); renderRecurringPanel(); } });
       fillSelect(cSel, [...new Set([...config.defaultClients, ...(r.client ? [r.client] : [])])].map(c => [c, c]), r.client);
-      const tSel = el('select', { onchange: e => { const t = splitTask(e.target.value); r.taskId = t.taskId; r.otherText = t.otherText; configSave(); } });
+      const tSel = el('select', { onchange: e => { const t = splitTask(e.target.value); r.taskId = t.taskId; r.otherText = t.otherText; saveRules(); } });
       fillSelect(tSel, (r.client ? taskOptions(r.client) : [['', '(no task)']]).filter(o => !o[0] || o[0].startsWith('__')), joinTask(r.taskId, r.otherText));
-      const st = el('input', { type: 'time', step: 900, value: r.start, onchange: e => { r.start = e.target.value || r.start; if (toMin(r.end) <= toMin(r.start)) r.end = slotTime(toMin(r.start) + 15); configSave(); renderRecurringPanel(); } });
-      const en = el('input', { type: 'time', step: 900, value: r.end === '24:00' ? '23:59' : r.end, class: bad ? 'rec-bad' : '', onchange: e => { r.end = e.target.value || r.end; configSave(); renderRecurringPanel(); } });
+      const st = el('input', { type: 'time', step: 900, value: r.start, onchange: e => { r.start = e.target.value || r.start; if (toMin(r.end) <= toMin(r.start)) r.end = slotTime(toMin(r.start) + 15); saveRules(); renderRecurringPanel(); } });
+      const en = el('input', { type: 'time', step: 900, value: r.end === '24:00' ? '23:59' : r.end, class: bad ? 'rec-bad' : '', onchange: e => { r.end = e.target.value || r.end; saveRules(); renderRecurringPanel(); } });
       const days = el('span', { class: 'rec-days' }, DAYS.map((d, i) => el('button', { type: 'button', class: (r.days || []).includes(i) ? 'on' : '', title: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i], text: d, onclick: () => {
-        const set = new Set(r.days || []); set.has(i) ? set.delete(i) : set.add(i); r.days = [...set].sort(); configSave(); renderRecurringPanel(); } })));
-      const on = el('label', { class: 'rec-note' }, el('input', { type: 'checkbox', checked: r.on !== false, onchange: e => { r.on = e.target.checked; configSave(); renderRecurringPanel(); } }), ' On');
-      const del = el('button', { class: 'ctrl-btn danger', text: 'Delete', onclick: () => { config.recurring = rules().filter(x => x !== r); configSave(); renderRecurringPanel(); toast(`Deleted “${r.label || 'recurring block'}”. Blocks it already filled stay.`, () => undoStep('undo')); } });
+        const set = new Set(r.days || []); set.has(i) ? set.delete(i) : set.add(i); r.days = [...set].sort(); saveRules(); renderRecurringPanel(); } })));
+      const on = el('label', { class: 'rec-note' }, el('input', { type: 'checkbox', checked: r.on !== false, onchange: e => { r.on = e.target.checked; saveRules(); renderRecurringPanel(); } }), ' On');
+      const del = el('button', { class: 'ctrl-btn danger', text: 'Delete', onclick: () => { config.recurring = rules().filter(x => x !== r); saveRules(); renderRecurringPanel(); toast(`Deleted “${r.label || 'recurring block'}”. Blocks it already filled stay.`, () => undoStep('undo')); } });
       list.append(el('div', { class: 'rec-rule' + (r.on === false ? ' off' : '') },
         el('div', { class: 'rec-row' }, name, on, del),
         el('div', { class: 'rec-row' }, cSel, tSel),
@@ -249,7 +259,7 @@
         el('button', { class: 'ctrl-btn primary', text: '+ Add recurring block', onclick: () => {
           const client = config.defaultClients[0]; if (!client) { toast('Add a client first.'); return; }
           rules().push({ id: uid(), label: 'Standup', client, taskId: '__meeting_int__', otherText: '', start: '09:00', end: '09:15', days: [1, 2, 3, 4, 5], from: todayStr(), on: true });
-          configSave(); renderRecurringPanel(); refreshVisible();
+          saveRules(); renderRecurringPanel();
         } }),
         el('button', { class: 'ctrl-btn', text: 'Apply to the day shown now', title: 'Fill this day’s empty slots from the rules', onclick: reapplyToday })));
   }
@@ -341,7 +351,7 @@
   // ══ Automatic backups ════════════════════════════════════════════════════════════════════════
   // Snapshots of everything (time, to-dos, saved tasks, settings), kept on this device: one each day you open the app,
   // plus one before a synced copy replaces your data or you restore a backup. The newest 10 are kept.
-  const SNAP_KEY = 'stt_snapshots', SNAP_MAX = 10, SNAP_BYTES = 3.2e6;
+  const SNAP_KEY = 'stt_snapshots', SNAP_MAX = 10, SNAP_BYTES = 1.8e6;   // browsers allow ~5 MB in all; the live data must always fit
   const snaps = () => { const s = LS.get(SNAP_KEY, []); return Array.isArray(s) ? s.filter(x => x && typeof x.data === 'string') : []; };
   const sigOf = () => JSON.stringify([db, todos, customTasks, config]);
   const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return str.length + ':' + h; };
@@ -357,6 +367,8 @@
       return true;
     } catch (e) { console.warn('snapshot', e); return false; }
   }
+  // Called when a save fails because storage is full: drop the oldest backup (keeping at least the newest). True if space was freed.
+  FEAT.freeSpace = () => { const l = snaps(); if (l.length < 2) return false; l.shift(); return LS.set(SNAP_KEY, l) || true; };
   FEAT.snapshot = reason => snapshot(reason || 'automatic');
   function dailySnapshot() {
     const last = snaps().pop(), today = todayStr();
@@ -390,7 +402,7 @@
   // ══ Reminders ════════════════════════════════════════════════════════════════════════════════
   const RCFG = 'stt_remind_cfg', RSEEN = 'stt_reminded';
   const rcfg = () => Object.assign({ todos: true, hours: true, hoursAt: '16:30', hoursUnder: 6, digestAt: '09:00' }, LS.get(RCFG, {}));
-  const stack = el('div', { id: 'remindStack' }); document.body.append(stack);
+  const stack = el('div', { id: 'remindStack' }); $('appTabBar').after(stack);   // fixed top-right on wide screens; an in-page banner under the tabs on phones
   function notify(title, body, tag, actions) {
     const card = el('div', { class: 'remind-card' }, el('b', { text: title }), body, el('div', { class: 'remind-actions' },
       ...(actions || []).map(([l, f]) => el('button', { class: 'primary', text: l, onclick: () => { f(); card.remove(); } })), el('button', { text: 'Dismiss', onclick: () => card.remove() })));
@@ -444,7 +456,7 @@
         perm === 'granted' ? el('span', { class: 'rec-note', text: '✓ Notifications are allowed on this device.' })
           : perm === 'denied' ? el('span', { class: 'rec-note', text: 'Notifications are blocked for this site. Allow them in your browser’s site settings.' })
           : perm === 'unsupported' ? el('span', { class: 'rec-note', text: 'This browser doesn’t support notifications. In-app reminders still work.' })
-          : el('button', { class: 'ctrl-btn primary', text: 'Allow notifications', onclick: () => Notification.requestPermission().then(renderRemindPanel) }),
+          : el('button', { class: 'ctrl-btn primary', text: 'Allow notifications', onclick: () => { try { const r = Notification.requestPermission(renderRemindPanel); if (r && r.then) r.then(renderRemindPanel); } catch { renderRemindPanel(); } } }),
         el('button', { class: 'ctrl-btn', text: 'Send a test', onclick: () => notify('Test reminder', 'This is what a reminder looks like.', 'test') })));
   }
 
@@ -472,7 +484,8 @@
   });
   FEAT.settings = () => { renderRecurringPanel(); renderRemindPanel(); renderBackupPanel(); renderThemePanel(); };
   FEAT.tab = activeTab();
-  FEAT.tabChanged = tab => { FEAT.tab = tab; timerUI(); };
+  FEAT.tabChanged = tab => { if (tab === 'tracker' && rulesDirty) { rulesDirty = false; renderAll(); }
+    if (tab === 'summary' && FEAT.tab !== 'summary') sum.anchor = null; FEAT.tab = tab; timerUI(); };
   FEAT.render = day => { renderGaps(day || getDay(currentDate)); };
 
   // Start-up (the main script already drew once, before this file loaded)

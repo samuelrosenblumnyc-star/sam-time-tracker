@@ -354,9 +354,12 @@
   const SNAP_KEY = 'stt_snapshots', SNAP_MAX = 10, SNAP_BYTES = 1.8e6;   // browsers allow ~5 MB in all; the live data must always fit
   const snaps = () => { const s = LS.get(SNAP_KEY, []); return Array.isArray(s) ? s.filter(x => x && typeof x.data === 'string') : []; };
   const sigOf = () => JSON.stringify([db, todos, customTasks, config]);
+  // Per-device switch (stored as plain text on this device only). Off = no automatic backups here; "Back up now" and the safety copy before a restore still work.
+  const autoBackupOn = () => { try { return localStorage.getItem('stt_backups_auto') !== 'off'; } catch { return true; } };
   const hash = str => { let h = 5381; for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0; return str.length + ':' + h; };
-  function snapshot(reason) {
+  function snapshot(reason, manual) {
     try {
+      if (!manual && !autoBackupOn()) return false;
       const list = snaps(), sig = hash(sigOf()), last = list[list.length - 1];
       if (!Object.keys(db).length && !Object.keys(todos).length) return false;           // nothing worth keeping
       if (last && last.sig === sig) return false;                                          // identical to the newest copy
@@ -369,8 +372,9 @@
   }
   // Called when a save fails because storage is full: drop the oldest backup (keeping at least the newest). True if space was freed.
   FEAT.freeSpace = () => { const l = snaps(); if (l.length < 2) return false; l.shift(); return LS.set(SNAP_KEY, l) || true; };
-  FEAT.snapshot = reason => snapshot(reason || 'automatic');
+  FEAT.snapshot = reason => snapshot(reason || 'automatic');   // used by the sync code before it replaces your data
   function dailySnapshot() {
+    if (!autoBackupOn()) return;
     const last = snaps().pop(), today = todayStr();
     if (!last || !(last.at && dateStr(new Date(last.at)) === today)) snapshot('automatic (daily)');
   }
@@ -378,7 +382,7 @@
     const when = new Date(s.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     if (!confirm(`Restore everything from the backup of ${when}?\n\nYour current data is backed up first, and the restored data is then uploaded to your Gist.`)) return;
     let d; try { d = JSON.parse(s.data); } catch { toast('That backup is damaged.'); return; }
-    snapshot('before restoring a backup');
+    snapshot('before restoring a backup', true);
     if (isObj(d.stt_v1)) db = cleanDb(d.stt_v1);
     if (isObj(d.stt_todos)) todos = cleanTodos(d.stt_todos);
     if (isObj(d.stt_custom)) customTasks = cleanCustom(d.stt_custom);
@@ -392,11 +396,15 @@
     const list = snaps().reverse();
     panel.replaceChildren(
       el('h2', { text: 'Automatic Backups' }),
-      el('p', { class: 'settings-desc', text: `A copy of all your data is saved on this device once a day, and before synced data replaces it. The last ${SNAP_MAX} are kept, so a bad edit or sync can always be rolled back.` }),
+      el('p', { class: 'settings-desc', text: `When on, a copy of all your data is saved on this device once a day, and before synced data replaces it. The last ${SNAP_MAX} are kept, so a bad edit or sync can always be rolled back. This switch is for this device only.` }),
+      el('label', { class: 'ft-switch' }, el('input', { type: 'checkbox', checked: autoBackupOn(), onchange: e => {
+        try { localStorage.setItem('stt_backups_auto', e.target.checked ? 'on' : 'off'); } catch { /* ignore */ }
+        if (e.target.checked) dailySnapshot();
+        toast(e.target.checked ? 'Automatic backups are on for this device.' : 'Automatic backups are off for this device. "Back up now" still works.'); renderBackupPanel(); } }), 'Keep automatic backups on this device'),
       el('div', { class: 'ft-list' }, list.length ? list.map(s => el('div', { class: 'ft-item' },
         el('div', { class: 'grow' }, new Date(s.at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }), el('small', { text: `${s.reason} · ${s.days} day${s.days === 1 ? '' : 's'} logged, ${s.entries} entries` })),
         el('button', { class: 'ctrl-btn', text: 'Restore…', onclick: () => restoreSnapshot(s) }))) : el('p', { class: 'settings-desc', text: 'No backups yet.' })),
-      el('div', { class: 'settings-actions' }, el('button', { class: 'ctrl-btn primary', text: 'Back up now', onclick: () => { toast(snapshot('manual') ? 'Backed up.' : 'Nothing has changed since the last backup.'); renderBackupPanel(); } })));
+      el('div', { class: 'settings-actions' }, snaps().length ? el('button', { class: 'ctrl-btn danger', text: 'Delete backups on this device', onclick: () => { if (confirm('Delete all automatic backups saved on this device? Your actual time and to-dos are not affected.')) { try { localStorage.removeItem(SNAP_KEY); } catch { /* ignore */ } toast('Backups deleted.'); renderBackupPanel(); } } }) : null, el('button', { class: 'ctrl-btn primary', text: 'Back up now', onclick: () => { toast(snapshot('manual', true) ? 'Backed up.' : 'Nothing has changed since the last backup.'); renderBackupPanel(); } })));
   }
 
   // ══ Reminders ════════════════════════════════════════════════════════════════════════════════

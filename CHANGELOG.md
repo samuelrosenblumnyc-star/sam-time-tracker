@@ -5,7 +5,7 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-(nothing right now)
+- **2026-10-28: On/off switch for automatic backups, per device** (Settings > Automatic Backups > "Keep automatic backups on this device"). It's stored only on that device, so you can have backups on for your laptop and off for your phone. While off, no daily backups and none before synced data replaces yours; "Back up now", the safety copy before a restore, and restoring older backups all still work. A new "Delete backups on this device" button clears them (your real data is not touched). Turning it back on takes a backup straight away.
 
 ## Published
 

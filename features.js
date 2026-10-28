@@ -457,7 +457,7 @@
       el('h2', { text: 'Reminders' }),
       el('p', { class: 'settings-desc', text: 'Gentle nudges while the app is open. Turn on notifications to also get them when the app is in another tab or window. (iPhone only allows notifications for apps added to the Home Screen, and they can’t arrive when the app is fully closed.)' }),
       el('label', { class: 'ft-switch' }, el('input', { type: 'checkbox', checked: c.todos, onchange: e => save({ todos: e.target.checked }) }), 'Remind me when a to-do is due (at its time, or a morning summary for ones without a time)'),
-      el('label', { class: 'ft-switch' }, el('input', { type: 'checkbox', checked: c.hours, onchange: e => save({ hours: e.target.checked }) }),
+      el('label', { class: 'ft-switch ft-inline' }, el('input', { type: 'checkbox', checked: c.hours, onchange: e => save({ hours: e.target.checked }) }),
         'On weekdays at ', el('input', { type: 'time', value: c.hoursAt, onchange: e => save({ hoursAt: e.target.value || '16:30' }), style: 'font-size:13px;padding:3px 5px' }),
         ', remind me if I’ve logged under ', el('input', { type: 'number', min: 1, max: 8, step: 0.5, value: c.hoursUnder, style: 'width:56px;font-size:13px;padding:3px 5px', onchange: e => save({ hoursUnder: +e.target.value || 6 }) }), ' hours'),
       el('div', { class: 'settings-actions' },

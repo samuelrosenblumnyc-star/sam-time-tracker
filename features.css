@@ -122,6 +122,8 @@ table.sum-grid { border-collapse: separate; border-spacing: 0; font-size: 12px; 
 .ft-item .grow { flex: 1; min-width: 160px; }
 .ft-item small { display: block; color: var(--f-muted); font-size: 11px; }
 .ft-switch { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+.ft-switch.ft-inline { display: block; line-height: 2.1; }
+.ft-switch.ft-inline > input[type=checkbox] { margin-right: 8px; vertical-align: middle; }
 .seg-theme { display: inline-flex; border: 1px solid var(--f-border); border-radius: 6px; overflow: hidden; }
 .seg-theme button { background: var(--f-surface); color: var(--f-text); border: none; padding: 6px 16px; font-size: 12px; cursor: pointer; font-family: inherit; }
 .seg-theme button.on { background: var(--f-head); color: #fff; font-weight: bold; }

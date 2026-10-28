@@ -5,6 +5,11 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
+(nothing right now)
+
+## Published
+
+### 2026-10-28: PR #8
 - **2026-10-28: Bug check of the new features and the rest of the app.** Fixed:
   - *Undo merged separate actions.* An edit made right after pressing Undo joined the older step, and quick actions on different things (e.g. adding a recurring block, then applying it) became one step. Steps now only combine for the same kind of edit in quick succession (typing).
   - *Gaps list missed a gap at the very end* (e.g. 10:30 to 11:30 before your last entry).
@@ -31,8 +36,6 @@ Every edit requested for the time tracker, newest first.
   - *Recurring to-dos*: a Repeat setting (daily, weekdays, weekly, every 2 weeks, monthly) on every to-do. Completing one creates the next with the following due date; un-checking removes that copy again.
   - *Reminders* (Settings): an in-app card when a to-do's time arrives, a morning summary for to-dos due today without a time, and a weekday reminder at 4:30 PM if you've logged under 6 hours (times and amount adjustable). Turn on notifications to also get them from other tabs and windows. Only works while the app is open (iPhone is limited to Home Screen apps).
   - *Dark mode* (Settings > Appearance): Auto (follows your device), Light or Dark.
-
-## Published
 
 ### 2026-10-26: PR #7
 - **2026-10-26: The red line now starts at the arrow.** The time tag's arrow ended inside the time column while the line only began at the column's edge, leaving a gap. A short red stem now runs from the arrow tip across the time column, so the line looks continuous from the arrow onward (desktop and phone).

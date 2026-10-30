@@ -5,7 +5,7 @@ Every edit requested for the time tracker, newest first.
 
 ## Not yet published
 
-(nothing right now)
+- **2026-10-30: 25 new lines for the yellow quote bar.** 12 funny ones about logging time ("Your calendar says 'busy.' Your timesheet says 'show your work.'") and 10 motivational ones in the same dry tone, plus 3 day-of-week lines that only appear on the right days (Wednesday: "Halfway through the week...", Thursday and Friday: "The weekend is a deliverable...", Friday: "Friday: the last 0.25 of the week."). Long lines now wrap onto a second line instead of being cut off with "..." (many of the old ones were being cut off, more so since the sync badge took some room). On mid-size screens (tablets, small laptops) the weekday name and the "Prev/Next" words, and below 900px the app title, are hidden to give the quote room.
 
 ## Published
 

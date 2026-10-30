@@ -138,3 +138,6 @@ table.sum-grid { border-collapse: separate; border-spacing: 0; font-size: 12px; 
   .remind-card { box-shadow: none; }
   .rec-rule { padding: 8px; }
 }
+
+#chartTip { position: fixed; z-index: 9999; display: none; pointer-events: none; white-space: pre; padding: 6px 10px; border-radius: 6px; font-size: 13px; line-height: 1.35; background: #1f2937; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.donut-wrap circle[data-tip] { cursor: pointer; }

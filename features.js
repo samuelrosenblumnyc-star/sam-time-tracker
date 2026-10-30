@@ -285,9 +285,9 @@
     Object.values(day.blocks).forEach(b => { const c = bClient(b); if (c) out[c] = (out[c] || 0) + 0.25; });
     return out;
   }
-  function donutSvg(items, total) {
+  function donutSvg(items, total, period) {
     const R = 70, C = 2 * Math.PI * R; let off = 0;
-    const segs = items.map(it => { const len = total ? it.hrs / total * C : 0, s = `<circle r="${R}" cx="95" cy="95" fill="none" stroke="${it.color}" stroke-width="26" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 95 95)"><title>${esc(it.name)}: ${fmtHrs(it.hrs)} h</title></circle>`; off += len; return s; }).join('');
+    const segs = items.map(it => { const len = total ? it.hrs / total * C : 0, s = `<circle r="${R}" cx="95" cy="95" fill="none" stroke="${it.color}" stroke-width="26" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 95 95)" data-tip="${esc(`${it.name}\n${fmtHrs(it.hrs)} h ${period} (${Math.round(it.hrs / total * 100)}%)`)}"></circle>`; off += len; return s; }).join('');
     return `<svg viewBox="0 0 190 190" role="img" aria-label="Hours by client"><circle r="${R}" cx="95" cy="95" fill="none" stroke="var(--f-surface2)" stroke-width="26"/>${segs}<text x="95" y="96" text-anchor="middle" class="donut-total">${fmtHrs(total)}</text><text x="95" y="113" text-anchor="middle" class="donut-sub">hours</text></svg>`;
   }
   function renderSummary() {
@@ -323,7 +323,7 @@
     // Charts
     const items = clients.map(c => ({ name: c, hrs: byClient[c], color: colorOf(c) })).sort((a, b) => b.hrs - a.hrs);
     const legend = el('div', { class: 'legend' }, items.map(it => el('div', null, el('i', { class: 'sw', style: `background:${it.color}` }), el('span', { class: 'nm', title: it.name, text: it.name }), el('span', { class: 'v', text: `${fmtHrs(it.hrs)} h · ${Math.round(it.hrs / total * 100)}%` }))));
-    const donut = el('div', { class: 'donut-wrap' }); donut.innerHTML = donutSvg(items, total); donut.append(legend);
+    const donut = el('div', { class: 'donut-wrap' }); donut.innerHTML = donutSvg(items, total, sum.mode === 'week' ? 'this week' : 'this month'); donut.append(legend);
     // Bars: per day (week) or per week (month)
     let cols;
     if (sum.mode === 'week') cols = days.map((d, i) => ({ label: new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) + ' ' + d.slice(8).replace(/^0/, ''), today: d === today, parts: perDay[i] }));
@@ -332,10 +332,20 @@
       cols = Object.values(wks).map(w => ({ ...w, label: 'Week of ' + w.label }));
     }
     const colTot = cols.map(c => Object.values(c.parts).reduce((a, b) => a + b, 0)), maxH = Math.max(8, ...colTot);
-    const bars = el('div', { class: 'bars' }, cols.map((c, i) => el('div', { class: 'bar-col' + (c.today ? ' is-today' : ''), title: `${c.label}: ${fmtHrs(colTot[i])} h` },
+    const bars = el('div', { class: 'bars' }, cols.map((c, i) => el('div', { class: 'bar-col' + (c.today ? ' is-today' : ''), 'data-tip': `${c.label}\n${fmtHrs(colTot[i])} h total` },
       el('div', { class: 'bar-val', text: colTot[i] ? fmtHrs(colTot[i]) : '' }),
-      el('div', { class: 'bar-stack', style: `height:${colTot[i] / maxH * 100 * 0.78}%` }, order.filter(n => c.parts[n]).map(n => el('i', { style: `height:${c.parts[n] / colTot[i] * 100}%;background:${colorOf(n)}`, title: `${n}: ${fmtHrs(c.parts[n])} h` }))),
+      el('div', { class: 'bar-stack', style: `height:${colTot[i] / maxH * 100 * 0.78}%` }, order.filter(n => c.parts[n]).map(n => el('i', { style: `height:${c.parts[n] / colTot[i] * 100}%;background:${colorOf(n)}`, 'data-tip': `${n}\n${c.label}: ${fmtHrs(c.parts[n])} h` }))),
       el('div', { class: 'bar-lbl', text: c.label }))));
+    const tipEl = document.getElementById('chartTip') || document.body.appendChild(el('div', { id: 'chartTip' }));
+    const showTip = e => {
+      const t = e.target.closest?.('[data-tip]');
+      if (!t) { tipEl.style.display = 'none'; return; }
+      tipEl.textContent = t.dataset.tip; tipEl.style.display = 'block';
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+      tipEl.style.left = Math.max(4, Math.min(innerWidth - w - 4, e.clientX + 12)) + 'px';
+      tipEl.style.top = Math.max(4, e.clientY - h - 12 < 4 ? e.clientY + 16 : e.clientY - h - 12) + 'px';
+    };
+    [donut, bars].forEach(n => { n.onmousemove = n.onclick = showTip; n.onmouseleave = () => { tipEl.style.display = 'none'; }; });
     const charts = total ? el('div', { class: 'sum-charts' }, donut, bars) : el('p', { class: 'sum-empty', text: 'Charts appear once you log some time.' });
 
     // Burn-rate groups for the period's month

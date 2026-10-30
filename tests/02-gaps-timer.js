@@ -1,0 +1,51 @@
+// "What's unlogged?" gaps strip and the start/stop timer
+const { ok, boot, launch, done, day, getDb } = require('./lib.js');
+const T = '2026-10-28';
+(async () => {
+  const b = await launch(); let p, bl;
+  console.log('Gaps');
+  p = await boot(b, { store: { stt_v1: { [T]: day({ '09:00': 'Axon', '09:15': 'Axon', '10:00': 'Admin', '10:15': 'Admin', '11:30': 'Flex' }) } }, time: T + 'T12:00:00' });
+  ok(/2 gaps/.test(await p.textContent('#gapBtn')), 'button counts the gaps');
+  await p.click('#gapBtn');
+  const chips = await p.$$eval('#gapStrip .gap-chip button:not(.gap-add)', e => e.map(x => x.textContent));
+  ok(chips.length === 2 && /9:30 AM – 10 AM/.test(chips[0]) && /10:30 AM – 11:30 AM/.test(chips[1]), 'chips list each gap (including one right before the last entry): ' + JSON.stringify(chips));
+  ok(await p.$$eval('#tbody td.gapcell', e => e.length) === 6 * 3, 'gap rows are highlighted across the columns');
+  await p.selectOption('#gapClient', 'Admin'); await p.click('#gapStrip .gap-chip .gap-add >> nth=0'); await p.waitForTimeout(150);
+  bl = (await getDb(p))[T].blocks;
+  ok(bl['09:30']?.client === 'Admin' && bl['09:45']?.client === 'Admin' && !bl['10:30'], 'fill one gap');
+  await p.click('#gapStrip .gap-fill .primary'); await p.waitForTimeout(150);
+  ok((await getDb(p))[T].blocks['11:15'] && await p.locator('#gapStrip').isHidden(), 'fill all gaps; the strip closes');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(100);
+  ok(!(await getDb(p))[T].blocks['10:30'], 'the fill can be undone');
+  ok(p.errs.length === 0, 'no errors'); await p.ctx.close();
+
+  console.log('Timer');
+  p = await boot(b, { store: { stt_v1: { [T]: day({}) } }, time: T + 'T10:07:00' });
+  await p.click('#timerBtn'); await p.selectOption('#timerPanel select >> nth=0', 'Admin'); await p.click('#timerPanel .primary');
+  ok(/Stop/.test(await p.textContent('#timerBtn')) && (await p.title()).includes('Admin'), 'running: button and tab title show it');
+  await p.reload(); await p.waitForTimeout(600);
+  ok(/Stop/.test(await p.textContent('#timerBtn')), 'the timer survives a reload');
+  await p.clock.fastForward(47 * 60000); await p.click('#timerBtn'); await p.waitForTimeout(200);
+  bl = (await getDb(p))[T].blocks;
+  ok(Object.keys(bl).sort().join() === '10:00,10:15,10:30,10:45' && Object.values(bl).every(x => x.client === 'Admin'), 'stop rounds 10:07 to 10:54 into 10:00-11:00');
+  await p.keyboard.press('Control+z'); await p.waitForTimeout(100);
+  ok(Object.keys((await getDb(p))[T].blocks).length === 0, 'the logged time can be undone');
+  await p.click('#timerBtn'); await p.click('#timerPanel .primary'); await p.click('#timerBtn'); await p.waitForTimeout(150);
+  ok(Object.keys((await getDb(p))[T].blocks).length === 1, 'a timer stopped at once still logs one slot');
+  await p.click('#timerBtn'); await p.click('#timerPanel .primary'); await p.click('#timerBtn', { button: 'right' }); await p.waitForTimeout(150);
+  ok(await p.evaluate(() => localStorage.getItem('stt_timer')) === null, 'right-click discards the timer');
+  await p.evaluate(() => localStorage.setItem('stt_timer', JSON.stringify({ start: Date.now() + 3600000, client: 'Axon', taskId: null, otherText: '' })));
+  await p.reload(); await p.waitForTimeout(500); const before = Object.keys((await getDb(p))[T].blocks).length;
+  await p.click('#timerBtn'); await p.waitForTimeout(100);
+  ok(Object.keys((await getDb(p))[T].blocks).length === before && /backwards/.test(await p.textContent('#toast')), 'a timer that "started in the future" logs nothing');
+  ok(p.errs.length === 0, 'no errors'); await p.ctx.close();
+
+  console.log('Timer across midnight');
+  p = await boot(b, { store: { stt_v1: { [T]: day({}) } }, time: T + 'T23:50:00' });
+  await p.click('#timerBtn'); await p.click('#timerPanel .primary'); await p.clock.fastForward(30 * 60000);
+  await p.click('#timerBtn'); await p.waitForTimeout(250);
+  const d = await getDb(p);
+  ok(Object.keys(d[T].blocks).join() === '23:45' && Object.keys(d['2026-10-29']?.blocks || {}).join() === '00:00', 'splits across the two days');
+  ok(p.errs.length === 0, 'no errors');
+  await done(b);
+})();

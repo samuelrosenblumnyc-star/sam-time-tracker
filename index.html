@@ -78,10 +78,18 @@
     font-family: 'Permanent Marker', cursive;
     font-size: 13px; font-style: normal; color: rgba(255,255,100,.85);
     flex: 1; text-align: center; line-height: 1.3;
-    transition: opacity .6s ease; white-space: nowrap; overflow: hidden;
-    text-overflow: ellipsis; cursor: default; letter-spacing: .02em;
+    transition: opacity .6s ease; cursor: default; letter-spacing: .02em;
+    /* long lines wrap onto a second line instead of being cut off with "..." */
+    line-height: 1.15; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
   }
   #quoteDisplay.fade { opacity: 0; }
+
+  /* Mid-size screens (small laptops, tablets): give the quote room by dropping the weekday name and the Prev/Next words */
+  @media (min-width: 641px) and (max-width: 1100px) {
+    #dayName, .nav-lbl { display: none; }
+    #quoteDisplay { font-size: 12px; }
+  }
+  @media (min-width: 641px) and (max-width: 900px) { #topbar h1 { display: none; } }
 
   /* ── App tab bar ── */
   #appTabBar {
@@ -3222,12 +3230,43 @@ const QUOTES = [
   "Today's to-do list is tomorrow's LinkedIn accomplishment.",
   "Not all heroes wear capes. Some just hit 8.0 hrs.",
   "If you're seeing this, just know you're crushing it every day.",
+  // Funny, about logging time
+  "Your calendar says 'busy.' Your timesheet says 'show your work.'",
+  "If it isn't logged, did it even happen? (Yes, but nobody will pay for it.)",
+  "Future you called. They want the 2 PM block filled in.",
+  "Fifteen minutes at a time, like a very slow lottery you always win.",
+  "Nobody ever said 'I wish I'd logged less time.'",
+  "That meeting that could've been an email? Still 0.25.",
+  "Reconstructing your Tuesday from memory on Friday: not a fun hobby.",
+  "Time flies when you're having fun. Time sprints when it's unlogged.",
+  "Squint at your day and the hours add up. Or just log them.",
+  "Somewhere a spreadsheet is waiting for you. Be kind to it.",
+  "Admin: because someone has to do the thing that pays for the thing.",
+  "Coffee is a time-management tool. Prove me wrong.",
+  // Motivational, same dry tone
+  "Progress is just small blocks, stacked consistently.",
+  "You don't have to feel productive to be productive.",
+  "A decent day logged beats a perfect day remembered.",
+  "Take the break. Log the break. (Just kidding, don't log the break.)",
+  "Hard day? Fill in the grid and let the numbers speak for you.",
+  "Small steps, big total.",
+  "Done for today counts as a win too.",
+  "You've survived 100% of your Mondays so far.",
+  "Hours logged: your quiet superpower.",
+  "Be where your hours are.",
 ];
+
+// Lines that only make sense on certain days of the week (0 = Sunday ... 6 = Saturday); they join the rotation on those days
+const DAY_QUOTES = {
+  3: ["Halfway through the week. Log it like you mean it."],
+  4: ["The weekend is a deliverable. You're almost there."],
+  5: ["Friday: the last 0.25 of the week.", "The weekend is a deliverable. You're almost there."],
+};
 
 let quoteIdx = Math.floor(Math.random() * QUOTES.length);
 const quoteEl = document.getElementById('quoteDisplay');
 
-const activeQuotes = () => window.EGGS?.quotes?.() || QUOTES;   // the easter eggs can swap the list for a day
+const activeQuotes = () => window.EGGS?.quotes?.() || [...QUOTES, ...(DAY_QUOTES[new Date().getDay()] || [])];   // the easter eggs can swap the list for a day
 function showNextQuote(immediate) {
   if (immediate) {
     const q = activeQuotes(); quoteEl.textContent = q[quoteIdx % q.length];
